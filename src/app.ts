@@ -14,10 +14,9 @@ class App {
     constructor(application: {port: Number, wsPort:number, middlewares:any[], services:any[], controllers:any[]}) {
         this.port = application.port,
         this.app = express();
-    
-
         this.initMiddlewares(application.middlewares)
         this.routes(application.controllers)
+        this.helloWorld()
     
     }
 
@@ -41,6 +40,10 @@ class App {
         middlewares.forEach((middleware) => {
             this.app.use(middleware)
         })
+    }
+
+    helloWorld() {
+        this.app.get('/', (req, res) => res.send('API-ONLINE'));
     }
 
     //initializes routes
