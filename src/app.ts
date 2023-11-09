@@ -6,12 +6,12 @@ import express, {Application} from 'express'
 
 class App {
     
-    public port:Number;
+    public port:number;
     public app: Application;
 
     public speechClient: any
 
-    constructor(application: {port: Number, wsPort:number, middlewares:any[], services:any[], controllers:any[]}) {
+    constructor(application: {port: number, wsPort:number, middlewares:any[], services:any[], controllers:any[]}) {
         this.port = application.port,
         this.app = express();
         this.initMiddlewares(application.middlewares)
@@ -22,7 +22,7 @@ class App {
 
     //starts server
     startServer() {
-        this.app.listen(this.port, () => {
+        this.app.listen(this.port, '0.0.0.0', () => {
             console.log(`Server running on ${this.port}`)
         })
     }
