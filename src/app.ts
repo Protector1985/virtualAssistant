@@ -20,8 +20,6 @@ class App {
     
     }
 
-    
-
     //starts server
     startServer() {
         this.app.listen(this.port, () => {
@@ -43,7 +41,10 @@ class App {
     }
 
     helloWorld() {
-        this.app.get('/', (req, res) => res.send('API-ONLINE'));
+        this.app.get('/', (req, res) => {
+            console.log("api request received")
+            res.send("API-ONLINE")
+        });
     }
 
     //initializes routes

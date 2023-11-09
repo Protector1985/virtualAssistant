@@ -29,7 +29,7 @@ class PhoneService {
     }
 
     async makeCall() {
-        console.log("Making phone call!!")
+        
         try {
             const applicationId = '2290981786043286781';
             const resp = await fetch(

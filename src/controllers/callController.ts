@@ -3,12 +3,17 @@ import fetch from 'node-fetch';
 import express, { Request, Response, Router, NextFunction } from 'express';
 import SpeechService from '../services/speechservice/SpeechService';
 const telnyx = require('telnyx')(process.env.TELNYX_API_KEY);
+
+
 class CallController extends SpeechService {
     public basePath = '/calls'
     public router: Router = express.Router();
     public mainLanguageModel: any
     public fromNumber: string;
     public toNumber: string;
+    public callStates: Record<string, string> = {};
+
+
     constructor() {
         super();
         this.initRoutes();
@@ -23,23 +28,35 @@ class CallController extends SpeechService {
     }
 
     
-
     public async callProcessor(req: Request, res: Response) {
         const data = req.body;
+
+        if (data.data.event_type === "call.hangup") {
+          this.callStates[data.data.payload.call_control_id] = 'ended';
+      }
+  
+      // Check call state before processing any event
+      if (this.callStates[data.data.payload.call_control_id] === 'ended' && data.data.event_type !== "call.hangup") {
+          console.log(`Ignoring event ${data.data.event_type} for ended call ${data.data.payload.call_control_id}`);
+          res.status(409).send("Call has already ended");
+          return;
+      }
         
         try {
           console.log(data.data.event_type)
-        if(data.data.event_type === "call.playback.started") { 
+
+        
+
+
+        if(data.data.event_type === "call.playback.started" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
           this.stopTranscription(data.data.payload.call_control_id)
-          
           res.send("OK")
         }
-        if(data.data.event_type === "call.playback.ended") { 
+        if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
           this.startTranscription(data.data.payload.call_control_id);
-          
           res.send("OK")
         }
-        if(data.data.event_type === "call.transcription") { 
+        if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
           
           const promptToSpeak = await this.mainModelPrompt(data.data.payload.transcription_data.transcript)
           
@@ -47,10 +64,7 @@ class CallController extends SpeechService {
               let triggerToRemove = "MENU_REQUESTED";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
               this.talk(data.data.payload.call_control_id, modifiedString.trim())
-              console.log(this.fromNumber)
-              console.log(this.toNumber)
               this.sendTextMessage(this.fromNumber, this.toNumber)
-
           } else if(promptToSpeak.includes("PERSON_REQUESTED")){
               let triggerToRemove = "PERSON_REQUESTED";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
@@ -62,31 +76,26 @@ class CallController extends SpeechService {
               let triggerToRemove = "RESERVATION_REQUESTED_BY_USER";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
               this.talk(data.data.payload.call_control_id, modifiedString)
-              console.log("Reservation requested.")
           } else {
               this.talk(data.data.payload.call_control_id, promptToSpeak)
           }
-          
           res.send("OK")
         }
-        if(data.data.event_type === "call.initiated") {
+        if(data.data.event_type === "call.initiated" && this.callStates[data.data.payload.call_control_id] !== 'ended') {
           this.mainLanguageModel = await this.initMainModel()
           this.answerCall(data.data.payload.call_control_id)
-         
-         res.send("OK")
-        }
-        if (data.data.event_type === 'call.answered') {
-            this.fromNumber=data.data.payload.to
-            this.toNumber=data.data.payload.from
-            const initMessage = this.mainLanguageModel?.choices[0]?.message?.content
-            this.talk(data.data.payload.call_control_id, initMessage)
-            res.send("OK")
+          res.send("OK")
         }
 
-        if(data.data.event_type === "call.hangup") {
-          // this.stopTranscription(data.data.payload.call_control_id)
+        if (data.data.event_type === 'call.answered' && this.callStates[data.data.payload.call_control_id] !== 'ended') {
+          this.fromNumber=data.data.payload.to
+          this.toNumber=data.data.payload.from
+          const initMessage = this.mainLanguageModel?.choices[0]?.message?.content
+          this.talk(data.data.payload.call_control_id, initMessage)
           res.send("OK")
-         }
+        }
+
+        
         } catch(err) {
           console.log(err)
         }
@@ -95,6 +104,10 @@ class CallController extends SpeechService {
 
     async answerCall(callControlId: string) {
       //answers call and inits ws connection
+      if (this.callStates[callControlId] === 'ended') {
+        console.log(`Cannot talk, call ${callControlId} has ended.`);
+        return;
+    }
 
       try {
         const resp = await fetch(
@@ -118,61 +131,78 @@ class CallController extends SpeechService {
         return data
       } catch(err) {
         console.log(err)
-      }
-      
-      
+      }  
   }
 
 
-  async startTranscription(callControlId: string) {
+async startTranscription(callControlId: string) {
+  if (this.callStates[callControlId] === 'ended') {
+    console.log(`Cannot talk, call ${callControlId} has ended.`);
+    return;
+  }
+  try {
     const call = new telnyx.Call({call_control_id: callControlId});
-    
-    try {
-      const transcription = await call.transcription_start({language: "en", transcription_engine: "B", interim_results: true});
-      return transcription
-    } catch(err){
-      throw err;
-    }
+    const transcription = await call.transcription_start({language: "en", transcription_engine: "B", interim_results: true});
+    return transcription
+  } catch(err){
+    return err
+ }
 }
 
 async stopTranscription(callControlId: string) {
-  const call = new telnyx.Call({call_control_id: callControlId});
+  if (this.callStates[callControlId] === 'ended') {
+    console.log(`Cannot talk, call ${callControlId} has ended.`);
+    return;
+  }
   
   try {
+    const call = new telnyx.Call({call_control_id: callControlId});
     const transcription = await call.transcription_stop({language: "en", transcription_engine: "B", interim_results: true});
     return transcription
   } catch(err){
-    throw err;
+    return err
   }
 }
  
 
-    async talk(callControllId:string, aiMessage: string) {
-        const base64Audio = await this.generateSpeech(aiMessage)
-        const call = new telnyx.Call({call_control_id: callControllId});
-        
-        try {
-          call.playback_start({ playback_content:base64Audio});
-        } catch(err) {
-          console.log(err)
-        }
-      }
+async talk(callControllId:string, aiMessage: string) {
+
+  if (this.callStates[callControllId] === 'ended') {
+    console.log(`Cannot talk, call ${callControllId} has ended.`);
+    return;
+}
+
+  const base64Audio = await this.generateSpeech(aiMessage)
+  const call = new telnyx.Call({call_control_id: callControllId});
+    try {
+      call.playback_start({ playback_content:base64Audio});
+    } catch(err) {
+      console.log(err)
+    }
+  }
 
     async stopAIAssistant(callControlId:string) {
+
+      if (this.callStates[callControlId] === 'ended') {
+        console.log(`Cannot talk, call ${callControlId} has ended.`);
+        return;
+    }
+
       const call = new telnyx.Call({ call_control_id: callControlId });
 
       try {
-        call.playback_start();
+        call.playback_stop();
       } catch(err) {
         console.log(err)
       }
     }
 
       async sendTextMessage(from:string, to:string) {
+
+        
         const apiUrl = 'https://api.telnyx.com/v2/messages';
         const telnyxApiKey = process.env.TELNYX_API_KEY; // Using the API Key from .env file
         
-
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${telnyxApiKey}`
@@ -204,6 +234,11 @@ async stopTranscription(callControlId: string) {
     }
 
     async transferCall(callControlId:string, destination:string) {
+      if (this.callStates[callControlId] === 'ended') {
+        console.log(`Cannot talk, call ${callControlId} has ended.`);
+        return;
+      }
+      
       const apiUrl = `https://api.telnyx.com/v2/calls/${callControlId}/actions/transfer`;
       const telnyxApiKey = process.env.TELNYX_API_KEY; // Using the API Key from .env file
 
