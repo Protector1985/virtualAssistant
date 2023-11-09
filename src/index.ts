@@ -6,7 +6,7 @@ import Promptservice from "./services/prompts/PromptService";
 import PhoneService from "./services/phoneCalls/PhoneService";
 import CallController from "./controllers/callController";
 
-const port:Number = Number(process.env.PORT)
+const port:number = Number(process.env.PORT)
 const wsPort: number= Number(process.env.WEB_SOCKET_PORT)
 
 
