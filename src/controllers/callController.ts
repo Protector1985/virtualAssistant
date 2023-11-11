@@ -46,7 +46,7 @@ class CallController extends SpeechService {
         try {
         if(data.data.event_type === "call.playback.started" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
         
-          this.stopTranscription(data.data.payload.call_control_id)
+          this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
           res.send("OK")
         }
         if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
@@ -68,7 +68,7 @@ class CallController extends SpeechService {
               await this.talk(data.data.payload.call_control_id, modifiedString, this.fromNumber)
               await this.transferCall(data.data.payload.call_control_id, "+13234253411")
               this.stopAIAssistant(data.data.payload.call_control_id)
-              this.stopTranscription(data.data.payload.call_control_id)
+              this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
           } else if(promptToSpeak.includes("RESERVATION_REQUESTED_BY_USER")) {
               let triggerToRemove = "RESERVATION_REQUESTED_BY_USER";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
@@ -151,7 +151,7 @@ async startTranscription(callControlId: string, targetNumber:string) {
  }
 }
 
-async stopTranscription(callControlId: string) {
+async stopTranscription(callControlId: string, targetNumber:string) {
   try {
   if (this.callStates[callControlId] === 'ended') {
     console.log(`Cannot talk, call ${callControlId} has ended.`);
@@ -160,7 +160,7 @@ async stopTranscription(callControlId: string) {
   
   
     const call = new telnyx.Call({call_control_id: callControlId});
-    const transcription = await call.transcription_stop({language: "en", transcription_engine: "B"}).catch((error:any)=>console.log(error.message));
+    const transcription = await call.transcription_stop({language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((error:any)=>console.log(error.message));
     return transcription
   } catch(err){
     return err
@@ -170,11 +170,12 @@ async stopTranscription(callControlId: string) {
 
 async talk(callControllId:string, aiMessage: string, targetNumber:string) {
   try {
+    
   if (this.callStates[callControllId] === 'ended') {
     console.log(`Cannot talk, call ${callControllId} has ended.`);
     return;
   }
-
+      this.stopTranscription(callControllId, targetNumber)
       const base64Audio = await this.generateSpeech(aiMessage, targetNumber)
       const call = new telnyx.Call({call_control_id: callControllId});
       call.playback_start({ playback_content:base64Audio}).catch((err:any)=> console.log(err.message));
