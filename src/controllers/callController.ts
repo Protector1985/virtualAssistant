@@ -59,21 +59,21 @@ class CallController extends SpeechService {
           if(promptToSpeak.includes("MENU_REQUESTED")) {
               let triggerToRemove = "MENU_REQUESTED";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
-              this.talk(data.data.payload.call_control_id, modifiedString.trim(), this.toNumber)
+              this.talk(data.data.payload.call_control_id, modifiedString.trim(), this.fromNumber)
               this.sendTextMessage(this.fromNumber, this.toNumber)
           } else if(promptToSpeak.includes("PERSON_REQUESTED")){
               let triggerToRemove = "PERSON_REQUESTED";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
-              await this.talk(data.data.payload.call_control_id, modifiedString, this.toNumber)
+              await this.talk(data.data.payload.call_control_id, modifiedString, this.fromNumber)
               await this.transferCall(data.data.payload.call_control_id, "+13234253411")
               this.stopAIAssistant(data.data.payload.call_control_id)
               this.stopTranscription(data.data.payload.call_control_id)
           } else if(promptToSpeak.includes("RESERVATION_REQUESTED_BY_USER")) {
               let triggerToRemove = "RESERVATION_REQUESTED_BY_USER";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
-              this.talk(data.data.payload.call_control_id, modifiedString, this.toNumber)
+              this.talk(data.data.payload.call_control_id, modifiedString, this.fromNumber)
           } else {
-              this.talk(data.data.payload.call_control_id, promptToSpeak, this.toNumber)
+              this.talk(data.data.payload.call_control_id, promptToSpeak, this.fromNumber)
           }
           res.send("OK")
         }
@@ -88,7 +88,7 @@ class CallController extends SpeechService {
           this.fromNumber=data.data.payload.to
           this.toNumber=data.data.payload.from
           const initMessage = this.mainLanguageModel?.choices[0]?.message?.content
-          this.talk(data.data.payload.call_control_id, initMessage, this.toNumber)
+          this.talk(data.data.payload.call_control_id, initMessage, this.fromNumber)
           res.send("OK")
         }
 
@@ -138,8 +138,7 @@ async startTranscription(callControlId: string, targetNumber:string) {
     
     return;
   }
-  console.log(targetNumber)
-  console.log(clientData[targetNumber])
+  
   try {
     const call = new telnyx.Call({call_control_id: callControlId});
     const transcription = await call.transcription_start({language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true});

@@ -11,7 +11,6 @@ class SpeechService extends Promptservice {
     }
 
     async generateSpeech(text: String, targetNumber:string): Promise<string> {
-        
         const elevenModel = clientData[targetNumber].language === "en" ?"eleven_turbo_v2" : "eleven_multilingual_v1"
         const apiKey = process.env.ELEVEN_LABS_API_KEY;
         
