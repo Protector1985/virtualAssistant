@@ -2,6 +2,7 @@ require('dotenv').config();
 import fetch from 'node-fetch';
 import express, { Request, Response, Router, NextFunction } from 'express';
 import SpeechService from '../services/speechservice/SpeechService';
+import { clientData } from '../clientData';
 const telnyx = require('telnyx')(process.env.TELNYX_API_KEY);
 
 
@@ -48,7 +49,7 @@ class CallController extends SpeechService {
           res.send("OK")
         }
         if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
-          this.startTranscription(data.data.payload.call_control_id);
+          this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
           res.send("OK")
         }
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
@@ -77,7 +78,8 @@ class CallController extends SpeechService {
           res.send("OK")
         }
         if(data.data.event_type === "call.initiated" && this.callStates[data.data.payload.call_control_id] !== 'ended') {
-          this.mainLanguageModel = await this.initMainModel(this.fromNumber)
+          
+          this.mainLanguageModel = await this.initMainModel(data.data.payload.to)
           this.answerCall(data.data.payload.call_control_id)
           res.send("OK")
         }
@@ -131,16 +133,19 @@ class CallController extends SpeechService {
   }
 
 
-async startTranscription(callControlId: string) {
+async startTranscription(callControlId: string, targetNumber:string) {
   if (this.callStates[callControlId] === 'ended') {
     
     return;
   }
+  console.log(targetNumber)
+  console.log(clientData[targetNumber])
   try {
     const call = new telnyx.Call({call_control_id: callControlId});
-    const transcription = await call.transcription_start({language: "en", transcription_engine: "B", interim_results: true});
+    const transcription = await call.transcription_start({language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true});
     return transcription
   } catch(err){
+    
     return err
  }
 }
