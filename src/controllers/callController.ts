@@ -77,7 +77,7 @@ class CallController extends SpeechService {
           res.send("OK")
         }
         if(data.data.event_type === "call.initiated" && this.callStates[data.data.payload.call_control_id] !== 'ended') {
-          this.mainLanguageModel = await this.initMainModel()
+          this.mainLanguageModel = await this.initMainModel(this.fromNumber)
           this.answerCall(data.data.payload.call_control_id)
           res.send("OK")
         }
