@@ -42,20 +42,20 @@ class CallController extends SpeechService {
           res.status(409).send("Call has already ended");
           return;
       }
-        
+        console.log(data.data.event_type)
         try {
         if(data.data.event_type === "call.playback.started" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
         
-          this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
+          // this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
           res.send("OK")
         }
         if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
          
-          this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
+          // this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
           res.send("OK")
         }
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
-          this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
+          console.log(data.data.payload.mainModelPrompt)
           const promptToSpeak = await this.mainModelPrompt(data.data.payload.transcription_data.transcript)
           if(promptToSpeak.includes("MENU_REQUESTED")) {
               let triggerToRemove = "MENU_REQUESTED";
@@ -68,7 +68,7 @@ class CallController extends SpeechService {
               await this.talk(data.data.payload.call_control_id, modifiedString, this.fromNumber)
               await this.transferCall(data.data.payload.call_control_id, "+13234253411")
               this.stopAIAssistant(data.data.payload.call_control_id)
-              this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
+              
           } else if(promptToSpeak.includes("RESERVATION_REQUESTED_BY_USER")) {
               let triggerToRemove = "RESERVATION_REQUESTED_BY_USER";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
@@ -91,6 +91,7 @@ class CallController extends SpeechService {
           this.toNumber=data.data.payload.from
           const initMessage = this.mainLanguageModel?.choices[0]?.message?.content
           this.talk(data.data.payload.call_control_id, initMessage, this.fromNumber)
+          this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
           res.send("OK")
         }
 
@@ -120,7 +121,7 @@ class CallController extends SpeechService {
             },
             body: JSON.stringify({
               client_state: 'aGF2ZSBhIG5pY2UgZGF5ID1d',
-              from_display_name:"Assistant",
+              from_display_name: "Assistant",
               command_id: '891510ac-f3e4-11e8-af5b-de00688a4901',
               send_silence_when_idle: true
             })
@@ -137,13 +138,14 @@ class CallController extends SpeechService {
 
 async startTranscription(callControlId: string, targetNumber:string) {
   try {
-  if (this.callStates[callControlId] === 'ended') { 
-    return;
-  }
+    if (this.callStates[callControlId] === 'ended') { 
+      return;
+    }
   
 
     const call = new telnyx.Call({call_control_id: callControlId});
-    const transcription = await call.transcription_start({language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((err:any)=> console.log(err.message));
+    const transcription = await call.transcription_start({client_state: 'aGF2ZSBhIG5pY2UgZGF5ID1d', transcription_tracks:"inbound", language: clientData[targetNumber].language, transcription_engine: "B"}).catch((err:any)=> console.log(err.message));
+    console.log(transcription)
     return transcription
   } catch(err){
     
@@ -175,10 +177,10 @@ async talk(callControllId:string, aiMessage: string, targetNumber:string) {
     console.log(`Cannot talk, call ${callControllId} has ended.`);
     return;
   }
-      this.stopTranscription(callControllId, targetNumber)
+      
       const base64Audio = await this.generateSpeech(aiMessage, targetNumber)
       const call = new telnyx.Call({call_control_id: callControllId});
-      call.playback_start({ playback_content:base64Audio}).catch((err:any)=> console.log(err.message));
+      call.playback_start({from_display_name: "Assistant", playback_content:base64Audio}).catch((err:any)=> console.log(err.message));
     } catch(err) {
       console.log(err)
     }
