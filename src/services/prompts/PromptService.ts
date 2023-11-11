@@ -43,7 +43,7 @@ class PromptService extends PhoneService {
         try {
             this.openai = new OpenAI();
             const convo = await this.openai.chat.completions.create({
-                model: 'gpt-3.5-turbo',
+                model: 'gpt-4-1106-preview',
                 max_tokens: 100,
                 temperature: 0.4,
                 messages: [
