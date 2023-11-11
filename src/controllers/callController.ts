@@ -59,21 +59,21 @@ class CallController extends SpeechService {
           if(promptToSpeak.includes("MENU_REQUESTED")) {
               let triggerToRemove = "MENU_REQUESTED";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
-              this.talk(data.data.payload.call_control_id, modifiedString.trim())
+              this.talk(data.data.payload.call_control_id, modifiedString.trim(), this.toNumber)
               this.sendTextMessage(this.fromNumber, this.toNumber)
           } else if(promptToSpeak.includes("PERSON_REQUESTED")){
               let triggerToRemove = "PERSON_REQUESTED";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
-              await this.talk(data.data.payload.call_control_id, modifiedString)
+              await this.talk(data.data.payload.call_control_id, modifiedString, this.toNumber)
               await this.transferCall(data.data.payload.call_control_id, "+13234253411")
               this.stopAIAssistant(data.data.payload.call_control_id)
               this.stopTranscription(data.data.payload.call_control_id)
           } else if(promptToSpeak.includes("RESERVATION_REQUESTED_BY_USER")) {
               let triggerToRemove = "RESERVATION_REQUESTED_BY_USER";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
-              this.talk(data.data.payload.call_control_id, modifiedString)
+              this.talk(data.data.payload.call_control_id, modifiedString, this.toNumber)
           } else {
-              this.talk(data.data.payload.call_control_id, promptToSpeak)
+              this.talk(data.data.payload.call_control_id, promptToSpeak, this.toNumber)
           }
           res.send("OK")
         }
@@ -88,7 +88,7 @@ class CallController extends SpeechService {
           this.fromNumber=data.data.payload.to
           this.toNumber=data.data.payload.from
           const initMessage = this.mainLanguageModel?.choices[0]?.message?.content
-          this.talk(data.data.payload.call_control_id, initMessage)
+          this.talk(data.data.payload.call_control_id, initMessage, this.toNumber)
           res.send("OK")
         }
 
@@ -166,14 +166,14 @@ async stopTranscription(callControlId: string) {
 }
  
 
-async talk(callControllId:string, aiMessage: string) {
+async talk(callControllId:string, aiMessage: string, targetNumber:string) {
 
   if (this.callStates[callControllId] === 'ended') {
     console.log(`Cannot talk, call ${callControllId} has ended.`);
     return;
 }
 
-  const base64Audio = await this.generateSpeech(aiMessage)
+  const base64Audio = await this.generateSpeech(aiMessage, targetNumber)
   const call = new telnyx.Call({call_control_id: callControllId});
     try {
       call.playback_start({ playback_content:base64Audio});

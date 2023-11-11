@@ -1,6 +1,7 @@
 import { Readable } from 'stream';
 import fetch from 'node-fetch';
 import Promptservice from '../prompts/PromptService';
+import { clientData } from '../../clientData';
 
 class SpeechService extends Promptservice {
     public phone:any
@@ -9,9 +10,9 @@ class SpeechService extends Promptservice {
       
     }
 
-    async generateSpeech(text: String): Promise<string> {
+    async generateSpeech(text: String, targetNumber:string): Promise<string> {
         
-      
+        const elevenModel = clientData[targetNumber].language === "en" ?"eleven_turbo_v2" : "eleven_multilingual_v1"
         const apiKey = process.env.ELEVEN_LABS_API_KEY;
         
         if (!apiKey) {
@@ -27,8 +28,7 @@ class SpeechService extends Promptservice {
       
         const body = JSON.stringify({
           "text": text,
-          // "model_id": "eleven_turbo_v2",
-          "model_id": "eleven_multilingual_v1",
+         "model_id": elevenModel,
           "voice_settings": {
             "stability": 0.2,
             "similarity_boost": 0.1
