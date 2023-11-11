@@ -43,11 +43,6 @@ class CallController extends SpeechService {
       }
         
         try {
-          console.log(data.data.event_type)
-
-        
-
-
         if(data.data.event_type === "call.playback.started" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
           this.stopTranscription(data.data.payload.call_control_id)
           res.send("OK")

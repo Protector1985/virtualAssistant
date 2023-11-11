@@ -27,7 +27,7 @@ class SpeechService extends Promptservice {
       
         const body = JSON.stringify({
           "text": text,
-          "model_id": "eleven_monolingual_v1",
+          "model_id": "eleven_turbo_v2",
           "voice_settings": {
             "stability": 0.2,
             "similarity_boost": 0.1
