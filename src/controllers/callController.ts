@@ -96,9 +96,10 @@ class CallController extends SpeechService {
         }
     }
 
-
+    
+    //answers the phone call
     async answerCall(callControlId: string) {
-      //answers call and inits ws connection
+      
       if (this.callStates[callControlId] === 'ended') {
         console.log(`Cannot talk, call ${callControlId} has ended.`);
         return;
@@ -132,7 +133,7 @@ class CallController extends SpeechService {
 
 async startTranscription(callControlId: string) {
   if (this.callStates[callControlId] === 'ended') {
-    console.log(`Cannot talk, call ${callControlId} has ended.`);
+    
     return;
   }
   try {
