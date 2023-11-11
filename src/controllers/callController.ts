@@ -55,7 +55,7 @@ class CallController extends SpeechService {
           res.send("OK")
         }
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
-          
+          this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
           const promptToSpeak = await this.mainModelPrompt(data.data.payload.transcription_data.transcript)
           if(promptToSpeak.includes("MENU_REQUESTED")) {
               let triggerToRemove = "MENU_REQUESTED";
