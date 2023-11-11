@@ -53,7 +53,7 @@ class SpeechService extends Promptservice {
         return base64Audio;
       } catch(err) {
         console.log(err)
-        return "error"
+        throw err
        
       }
       }
