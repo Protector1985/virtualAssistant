@@ -131,7 +131,7 @@ class CallController extends SpeechService {
         );
         
         const data = await resp.json();
-        this.callStates[data.data.payload.call_control_id] = data.data.result;
+        this.callStates[callControlId] = data.data.result;
      
         return data
       } catch(err) {
