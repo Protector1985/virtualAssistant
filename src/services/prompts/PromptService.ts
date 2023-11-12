@@ -43,7 +43,7 @@ class PromptService extends PhoneService {
     }
 
     async initMainModel(callControlId:string, targetNumber:string) {
-       
+       console.log(targetNumber)
         try {
           
             this.conversationHistory = {
@@ -58,7 +58,6 @@ class PromptService extends PhoneService {
                 temperature: 0.4,
                 messages: [
                     { role: 'system', content: clientData[targetNumber].systemPrompt()},
-                   
                 ],
             });
 

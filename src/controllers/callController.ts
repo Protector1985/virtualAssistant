@@ -244,7 +244,7 @@ async talk(callControllId:string, aiMessage: string, targetNumber:string) {
 
     async transferCall(callControlId:string, destination:string) {
       try {
-      
+     
       if (this.callStates[callControlId] === 'ended') {
         console.log(`Cannot talk, call ${callControlId} has ended.`);
         return;
