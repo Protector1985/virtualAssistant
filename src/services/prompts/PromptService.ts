@@ -43,7 +43,8 @@ class PromptService extends PhoneService {
     }
 
     async initMainModel(targetNumber:string) {
-      
+        console.log(clientData)
+        console.log(targetNumber)
         try {
             this.openai = new OpenAI();
             const convo = await this.openai.chat.completions.create({
@@ -51,14 +52,14 @@ class PromptService extends PhoneService {
                 max_tokens: 100,
                 temperature: 0.4,
                 messages: [
-                    { role: 'system', content: clientData[targetNumber].systemPrompt},
+                    { role: 'system', content: clientData[targetNumber].systemPrompt()},
                    
                 ],
             });
 
             // Add the initial system message to the conversation history
             
-            this.conversationHistory.push({ role: 'system', content: clientData[targetNumber].systemPrompt})
+            this.conversationHistory.push({ role: 'system', content: clientData[targetNumber].systemPrompt()})
             this.conversationHistory.push({ role: 'assistant', content: convo.choices[0].message.content + "Keep response short within 50 tokens. Don't start the sentence with Assistant - just the description of what you want to say." });
 
             return convo;

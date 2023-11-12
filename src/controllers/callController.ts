@@ -45,35 +45,37 @@ class CallController extends SpeechService {
         console.log(data.data.event_type)
         try {
         if(data.data.event_type === "call.playback.started" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
-        
-          // this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
+         this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
           res.send("OK")
         }
         if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
-         
-          // this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
+          this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
           res.send("OK")
         }
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
-          console.log(data.data.payload.mainModelPrompt)
+          
           const promptToSpeak = await this.mainModelPrompt(data.data.payload.transcription_data.transcript)
           if(promptToSpeak.includes("MENU_REQUESTED")) {
               let triggerToRemove = "MENU_REQUESTED";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
               this.talk(data.data.payload.call_control_id, modifiedString.trim(), this.fromNumber)
-              this.sendTextMessage(this.fromNumber, this.toNumber)
+              this.sendTextMessage(this.fromNumber, this.toNumber, "MENU_REQUESTED")
           } else if(promptToSpeak.includes("PERSON_REQUESTED")){
               let triggerToRemove = "PERSON_REQUESTED";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
               await this.talk(data.data.payload.call_control_id, modifiedString, this.fromNumber)
-              await this.transferCall(data.data.payload.call_control_id, "+13234253411")
+              setTimeout(async () => {
+                await this.transferCall(data.data.payload.call_control_id, clientData[this.fromNumber].redirectNumber)
+              }, 5000)
+              
               this.stopAIAssistant(data.data.payload.call_control_id)
               
-          } else if(promptToSpeak.includes("RESERVATION_REQUESTED_BY_USER")) {
-              let triggerToRemove = "RESERVATION_REQUESTED_BY_USER";
+          } else if(promptToSpeak.includes("RESERVATION_REQUESTED")) {
+              let triggerToRemove = "RESERVATION_REQUESTED";
               let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
               this.talk(data.data.payload.call_control_id, modifiedString, this.fromNumber)
-          } else {
+              this.sendTextMessage(this.fromNumber, this.toNumber, "RESERVATION_REQUESTED")
+            } else {
               this.talk(data.data.payload.call_control_id, promptToSpeak, this.fromNumber)
           }
           res.send("OK")
@@ -203,11 +205,10 @@ async talk(callControllId:string, aiMessage: string, targetNumber:string) {
       }
     }
 
-      async sendTextMessage(from:string, to:string) {
+      async sendTextMessage(from:string, to:string, type:string) {
         try {
-        
-        const apiUrl = 'https://api.telnyx.com/v2/messages';
-        const telnyxApiKey = process.env.TELNYX_API_KEY; // Using the API Key from .env file
+          const apiUrl = 'https://api.telnyx.com/v2/messages';
+          const telnyxApiKey = process.env.TELNYX_API_KEY; // Using the API Key from .env file
         
         const headers = {
             'Content-Type': 'application/json',
@@ -217,7 +218,7 @@ async talk(callControllId:string, aiMessage: string, targetNumber:string) {
         const body = JSON.stringify({
             'from': from,
             'to': to,
-            'text': 'You can find the menu for Mr Chow here: https://www.mrchow.com/order-online/ '
+            'text': type === "RESERVATION_REQUESTED" ? clientData[from].reservationText()  : clientData[from].textMessageText()
         });
 
         
