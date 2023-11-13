@@ -11,15 +11,12 @@ class PromptService extends PhoneService {
     private conversationHistory:any;
 
     constructor() {
-        super();
-        
+        super(); 
     }
 
     async mainModelPrompt(callControlId:string, prompt: string) {
         
         try {
-           
-            
             // Add the user's prompt to the conversation history
             this.conversationHistory[callControlId].push({ role: 'user', content: prompt });
 
@@ -43,14 +40,12 @@ class PromptService extends PhoneService {
     }
 
     async initMainModel(callControlId:string, targetNumber:string) {
-       console.log(targetNumber)
+      
         try {
-          
             this.conversationHistory = {
                 [callControlId]: []
             }
             
-
             this.openai = new OpenAI();
             const convo = await this.openai.chat.completions.create({
                 model: 'gpt-4-1106-preview',
@@ -62,7 +57,6 @@ class PromptService extends PhoneService {
             });
 
             // Add the initial system message to the conversation history
-            
             this.conversationHistory[callControlId].push({ role: 'system', content: clientData[targetNumber].systemPrompt()})
             this.conversationHistory[callControlId].push({ role: 'assistant', content: convo.choices[0].message.content + "Keep response short within 50 tokens. Don't start the sentence with Assistant - just the description of what you want to say." });
 
