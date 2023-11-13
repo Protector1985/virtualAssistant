@@ -107,6 +107,6 @@ export const clientData: Record<string, ClientInfo> = {
         reservationText: function () {
             return `You can make a reservation here: ${this.orderUrl}`
         },
-        language: "de"
+        language: "en"
     }
 };
