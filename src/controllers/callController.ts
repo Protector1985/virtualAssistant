@@ -88,6 +88,11 @@ class CallController extends SpeechService {
           if(data.data.event_type === "streaming.started"){
             res.send("OK")
           }
+
+          if(data.data.event_type === "streaming.failed"){
+            res.send("OK")
+          }
+
           if(data.data.event_type === "streaming.stopped"){
             res.send("OK")
           }
