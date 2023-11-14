@@ -4,6 +4,7 @@ import express, { Request, Response, Router, NextFunction } from 'express';
 import SpeechService from '../services/speechservice/SpeechService';
 import { clientData } from '../clientData';
 import WebsocketService from '../services/websocket/WebsocketService'
+import {audioFiller} from './assets/audioFiller'
 const telnyx = require('telnyx')(process.env.TELNYX_API_KEY);
 
 
@@ -41,8 +42,7 @@ class CallController extends SpeechService {
     
     public async callProcessor(req: Request, res: Response) {
         const data = req.body;
-
-        console.log(data.data.event_type)
+        
         if (data.data.event_type === "call.hangup") {
           this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
           this.callStates[data.data.payload.call_control_id] = null;
@@ -86,6 +86,7 @@ class CallController extends SpeechService {
         try {
 
           if(data.data.event_type === "streaming.started"){
+            
             res.send("OK")
           }
 
@@ -94,6 +95,7 @@ class CallController extends SpeechService {
           }
 
           if(data.data.event_type === "streaming.stopped"){
+            
             res.send("OK")
           }
   
@@ -101,14 +103,18 @@ class CallController extends SpeechService {
           
         if(data.data.event_type === "call.playback.started" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
         this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
-          res.send("OK")
+        res.send("OK")
         }
-        if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
+        if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') {  
           this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
           res.send("OK")
         }
         
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
+          const call = new telnyx.Call({call_control_id: data.data.payload.call_control_id});
+          call.playback_start({from_display_name: "Assistant", playback_content:audioFiller[Math.floor(Math.random() * 2)] }).catch((err:any)=> console.log(err.message));
+              
+              
           this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
           const readMessage = await this.mainModelPrompt(data.data.payload.call_control_id, data.data.payload.transcription_data.transcript)
           let promptToSpeak =  await readMessage?.read()
@@ -251,9 +257,16 @@ async stopTranscription(callControlId: string, targetNumber:string) {
   }
  
   
+  
     const call = new telnyx.Call({call_control_id: callControlId});
+    
+              
     const transcription = await call.transcription_stop({language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((error:any)=>console.log(error.message));
+    
     this.talkStream(callControlId)
+    
+   
+    
     return transcription
   } catch(err){
     return err
@@ -271,14 +284,8 @@ async talk(callControllId:string, message:string) {
   
 
       const call = new telnyx.Call({call_control_id: callControllId});
-      if(this.currentEvent[callControllId] !== "call.answered") {
-        
-        // const fillerAudio = await this.generateSpeech("uhhhmmmmm", targetNumber)
-        // console.log(fillerAudio)
-        
-       
-      }
-      console.log(message)
+         
+      
       const base64Audio = await this.generateSpeech(message, this.fromNumber)
       call.playback_start({from_display_name: "Assistant", playback_content:base64Audio}).catch((err:any)=> console.log(err.message));
     } catch(err) {

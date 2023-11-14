@@ -30,25 +30,25 @@ class App {
         this.wsServer.on('connection', (ws) => {
             console.log('WebSocket connection established');
             
-            // ws.on('message', (message) => {
-            //     const messageString = message.toString();
-            //     try {
-            //         const messageJSON = JSON.parse(messageString);
+            ws.on('message', (message) => {
+                const messageString = message.toString();
+                try {
+                    const messageJSON = JSON.parse(messageString);
         
-            //         if (messageJSON.event === "start") {
-            //             console.log("Call Started:", messageJSON);
+                    if (messageJSON.event === "start") {
+                        console.log("Call Started:", messageJSON);
                        
-            //         } else if (messageJSON.event === "media") {
-            //             const rawAudio = Buffer.from(messageJSON.media.payload, 'base64');
+                    } else if (messageJSON.event === "media") {
+                        const rawAudio = Buffer.from(messageJSON.media.payload, 'base64');
                         
-            //         } else if (messageJSON.event === "stop") {
-            //             console.log("Call Stopped:", messageJSON);
+                    } else if (messageJSON.event === "stop") {
+                        console.log("Call Stopped:", messageJSON);
                         
-            //         }
-            //     } catch (e) {
-            //         console.error('Error parsing JSON:', e);
-            //     }
-            // });
+                    }
+                } catch (e) {
+                    console.error('Error parsing JSON:', e);
+                }
+            });
 
             ws.on('close', () => {
                 console.log('WebSocket connection closed');
