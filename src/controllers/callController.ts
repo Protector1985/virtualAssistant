@@ -15,8 +15,8 @@ class CallController extends SpeechService {
     public toNumber: string;
     public callStates: any = {};
     public currentEvent: any = {};
-    private demoMode:any= true
-    private demoRunning:any = true;
+    private demoMode:any= false
+    private demoRunning:any = false;
     private webSocketService: WebsocketService = new WebsocketService()
 
     constructor() {
@@ -33,8 +33,7 @@ class CallController extends SpeechService {
         //receives webhook to start response logic.
         this.router.post(this.basePath + '/call', this.callProcessor.bind(this));
         this.router.get(this.basePath + '/', (res:Response)=> res.send("API online!"));
-        this.router.post(this.basePath + '/webhook', (req, res) => {
-          
+        this.router.post(this.basePath + '/webhook', (req, res) => { 
           res.send("OK")
         })
     }
@@ -42,7 +41,7 @@ class CallController extends SpeechService {
     
     public async callProcessor(req: Request, res: Response) {
         const data = req.body;
-        
+       
         if (data.data.event_type === "call.hangup") {
           this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
           this.callStates[data.data.payload.call_control_id] = null;
@@ -50,7 +49,7 @@ class CallController extends SpeechService {
       if(this.demoMode)  {
         
         if(data.data.event_type === "call.initiated") {
-          this.answerCall(data.data.payload.call_control_id)
+          this.answerCall(data.data.payload.call_control_id, {})
         }
        
         if(data.data.event_type === "call.answered" && this.demoRunning === true) {
@@ -58,12 +57,12 @@ class CallController extends SpeechService {
           this.fromNumber=data.data.payload.to
           this.toNumber=data.data.payload.from
           
-          setTimeout(async () => {
-            await this.talk(data.data.payload.call_control_id, "Hey!!! To place your order, click the link I just texted you. And we close at 9 PM tonight!", this.fromNumber)
-            this.sendTextMessage(this.fromNumber, this.toNumber, "MENU_REQUESTED", data.data.payload.call_control_id)
+          // setTimeout(async () => {
+          //   await this.talk(data.data.payload.call_control_id, "Hey!!! To place your order, click the link I just texted you. And we close at 9 PM tonight!", this.fromNumber)
+          //   this.sendTextMessage(this.fromNumber, this.toNumber, "MENU_REQUESTED", data.data.payload.call_control_id)
             
-          }, 5000)
-          res.send("OK")
+          // }, 5000)
+          // res.send("OK")
          
         }
 
@@ -74,6 +73,8 @@ class CallController extends SpeechService {
         }
 
       } else {
+
+        
       // Check call state before processing any event
       if (this.callStates[data.data.payload.call_control_id] === 'ended' && data.data.event_type !== "call.hangup") {
           console.log(`Ignoring event ${data.data.event_type} for ended call ${data.data.payload.call_control_id}`);
@@ -82,6 +83,16 @@ class CallController extends SpeechService {
       }
         
         try {
+
+          if(data.data.event_type === "streaming.started"){
+            res.send("OK")
+          }
+          if(data.data.event_type === "streaming.stopped"){
+            res.send("OK")
+          }
+  
+          
+          
         if(data.data.event_type === "call.playback.started" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
         this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
           res.send("OK")
@@ -93,36 +104,42 @@ class CallController extends SpeechService {
         
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
           this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
-          const promptToSpeak = await this.mainModelPrompt(data.data.payload.call_control_id, data.data.payload.transcription_data.transcript)
-          if(promptToSpeak.includes("MENU_REQUESTED")) {
+          const readMessage = await this.mainModelPrompt(data.data.payload.call_control_id, data.data.payload.transcription_data.transcript)
+          let promptToSpeak =  await readMessage?.read()
+          const prompt = promptToSpeak?.message
+         
+          if(prompt?.includes("MENU_REQUESTED")) {
               let triggerToRemove = "MENU_REQUESTED";
-              let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
-              this.talk(data.data.payload.call_control_id, modifiedString.trim(), this.fromNumber)
+              let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
+              this.talk(data.data.payload.call_control_id, modifiedString.trim())
               this.sendTextMessage(this.fromNumber, this.toNumber, "MENU_REQUESTED", data.data.payload.call_control_id)
-          } else if(promptToSpeak.includes("PERSON_REQUESTED")){
+          } else if(prompt?.includes("PERSON_REQUESTED")){
               let triggerToRemove = "PERSON_REQUESTED";
-              let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
-              await this.talk(data.data.payload.call_control_id, modifiedString, this.fromNumber)
+              let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
+              await this.talk(data.data.payload.call_control_id, modifiedString)
               setTimeout(async () => {
                 await this.transferCall(data.data.payload.call_control_id, clientData[this.fromNumber].redirectNumber)
               }, 5000)
               
               this.stopAIAssistant(data.data.payload.call_control_id)
               
-          } else if(promptToSpeak.includes("RESERVATION_REQUESTED")) {
+          } else if(prompt?.includes("RESERVATION_REQUESTED")) {
               let triggerToRemove = "RESERVATION_REQUESTED";
-              let modifiedString = promptToSpeak.replace(new RegExp(triggerToRemove, 'g'), "");
-              this.talk(data.data.payload.call_control_id, modifiedString, this.fromNumber)
+              let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
+              this.talk(data.data.payload.call_control_id, modifiedString)
               this.sendTextMessage(this.fromNumber, this.toNumber, "RESERVATION_REQUESTED", data.data.payload.call_control_id)
             } else {
-              this.talk(data.data.payload.call_control_id, promptToSpeak, this.fromNumber)
+              if(typeof prompt === 'string') {
+                this.talk(data.data.payload.call_control_id, prompt)
+              }
+              
           }
           res.send("OK")
         }
         if(data.data.event_type === "call.initiated" && this.callStates[data.data.payload.call_control_id] !== 'ended') {
           this.currentEvent[data.data.payload.call_control_id] = "call.initiated"
-          this.mainLanguageModel = await this.initMainModel(data.data.payload.call_control_id,data.data.payload.to)
-          this.answerCall(data.data.payload.call_control_id)
+          const startingPrompt = await this.initMainModel(data.data.payload.call_control_id,data.data.payload.to, this.generateSpeech)
+          this.answerCall(data.data.payload.call_control_id, startingPrompt)
           res.send("OK")
         }
 
@@ -130,17 +147,13 @@ class CallController extends SpeechService {
           this.currentEvent[data.data.payload.call_control_id] = "call.answered"
           this.fromNumber=data.data.payload.to
           this.toNumber=data.data.payload.from
-          const initMessage = this.mainLanguageModel?.choices[0]?.message?.content
-          this.talk(data.data.payload.call_control_id, initMessage, this.fromNumber)
-          this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
+          // const initMessage = this.mainLanguageModel?.choices[0]?.message?.content
+          // this.talk(data.data.payload.call_control_id, initMessage, this.fromNumber)
+          // this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
           res.send("OK")
-        }
-      
-
-        
-        } catch(err) {
+        }} catch(err) {
           console.log(err)
-        }
+        } 
       }
     }
 
@@ -167,7 +180,8 @@ class CallController extends SpeechService {
 
     
     //answers the phone call
-    async answerCall(callControlId: string) {
+    async answerCall(callControlId: string, startingPrompt: any) {
+  
       try {
       if (this.callStates[callControlId] === 'ended') {
         console.log(`Cannot talk, call ${callControlId} has ended.`);
@@ -193,7 +207,11 @@ class CallController extends SpeechService {
         
         const data = await resp.json();
         this.callStates[callControlId] = data.data.result;
-
+        
+        const read = await startingPrompt.read()
+        
+        this.talk(callControlId, read.message)
+          
        
         return data
       } catch(err) {
@@ -237,14 +255,14 @@ async stopTranscription(callControlId: string, targetNumber:string) {
 }
  
 
-async talk(callControllId:string, aiMessage: string, targetNumber:string) {
+async talk(callControllId:string, message:string) {
   try {
     
   if (this.callStates[callControllId] === 'ended') {
     console.log(`Cannot talk, call ${callControllId} has ended.`);
     return;
   }
-
+  
 
       const call = new telnyx.Call({call_control_id: callControllId});
       if(this.currentEvent[callControllId] !== "call.answered") {
@@ -254,9 +272,8 @@ async talk(callControllId:string, aiMessage: string, targetNumber:string) {
         
        
       }
-      
-      
-      const base64Audio = await this.generateSpeech(aiMessage, targetNumber)
+      console.log(message)
+      const base64Audio = await this.generateSpeech(message, this.fromNumber)
       call.playback_start({from_display_name: "Assistant", playback_content:base64Audio}).catch((err:any)=> console.log(err.message));
     } catch(err) {
       console.log(err)
@@ -290,9 +307,9 @@ async talk(callControllId:string, aiMessage: string, targetNumber:string) {
               return "Here is the menu you requested! https://www.phonepal.com"
             } else {
               if(type === "RESERVATION_REQUESTED") {
-                clientData[from].reservationText
+                return clientData[from].reservationText
               } else {
-                clientData[from].textMessageText()
+                return clientData[from].textMessageText()
               }
             }
           }
