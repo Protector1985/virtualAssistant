@@ -24,7 +24,7 @@ class PromptService extends PhoneService {
             this.conversationHistory[callControlId].push({ role: 'user', content: prompt });
 
             const convo = await this.openai.chat.completions.create({
-                model: 'gpt-4',
+                model: 'gpt-4-1106-preview',
                 stream:true,
                 max_tokens: 100,
                 temperature: 0.3,
@@ -61,7 +61,7 @@ class PromptService extends PhoneService {
             
             this.openai = new OpenAI();
             const convo = await this.openai.chat.completions.create({
-                model: 'gpt-4',
+                model: 'gpt-4-1106-preview',
                 stream:true,
                 max_tokens: 100,
                 temperature: 0.4,

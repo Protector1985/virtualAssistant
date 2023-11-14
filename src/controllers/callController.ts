@@ -41,7 +41,8 @@ class CallController extends SpeechService {
     
     public async callProcessor(req: Request, res: Response) {
         const data = req.body;
-       
+
+        console.log(data.data.event_type)
         if (data.data.event_type === "call.hangup") {
           this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
           this.callStates[data.data.payload.call_control_id] = null;
