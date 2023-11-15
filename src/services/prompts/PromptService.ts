@@ -4,6 +4,7 @@ import { OpenAIStream, StreamingTextResponse } from 'ai';
 import PhoneService from "../phoneCalls/PhoneService";
 import { clientData } from "../../clientData";
 import SpeechService from "../speechservice/SpeechService";
+import CallController from "../../controllers/callController";
 
 const voice: any = require('elevenlabs-node');
 
@@ -17,8 +18,14 @@ class PromptService extends PhoneService {
         super(); 
     }
 
+    clearConversationHistory(callControlId:string) {
+        console.log(`Conversation cleared for ${callControlId}`)
+        console.log(this.conversationHistory)
+        //cleans up the conversation history after a call
+        delete this.conversationHistory[callControlId]
+    }
+
     async mainModelPrompt(callControlId:string, prompt: string) {
-        
         try {
             // Add the user's prompt to the conversation history
             this.conversationHistory[callControlId].push({ role: 'user', content: prompt });
