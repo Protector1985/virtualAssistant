@@ -27,8 +27,8 @@ class App {
         let fileStream:any;
         let isCallActive = false
         
-        this.wsServer.on('connection', (ws) => {
-            console.log('WebSocket connection established');
+        // this.wsServer.on('connection', (ws) => {
+        //     console.log('WebSocket connection established');
             
             // ws.on('message', (message) => {
             //     const messageString = message.toString();
@@ -55,7 +55,7 @@ class App {
             // });
 
             // You can also handle other events like 'error'
-        });
+        // });
     }
 
     //starts server

@@ -11,20 +11,19 @@ const telnyx = require('telnyx')(process.env.TELNYX_API_KEY);
 class CallController extends SpeechService {
     public basePath = '/calls'
     public router: Router = express.Router();
-    public mainLanguageModel: any
-    public fromNumber: string;
-    public toNumber: string;
+    public fromNumber:any = {};
+    public toNumber:any = {};
     public callStates: any = {};
     public currentEvent: any = {};
     private demoMode:any= false
     private demoRunning:any = false;
-    private webSocketService: WebsocketService = new WebsocketService()
+    private transcribingActive:any = {}
+    // private webSocketService: WebsocketService = new WebsocketService()
 
     constructor() {
         super();
         this.initRoutes();
-        this.fromNumber=""
-        this.toNumber=""
+        
         
 
         
@@ -42,21 +41,29 @@ class CallController extends SpeechService {
     
     public async callProcessor(req: Request, res: Response) {
         const data = req.body;
-        
+       
+        //cleans up the state!
         if (data.data.event_type === "call.hangup") {
-          this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
-          this.callStates[data.data.payload.call_control_id] = null;
+          delete this.toNumber[data.data.payload.call_control_id]
+          delete this.fromNumber[data.data.payload.call_control_id]
+          delete this.transcribingActive[data.data.payload.call_control_id]
+          delete this.currentEvent[data.data.payload.call_control_id]
+          delete this.callStates[data.data.payload.call_control_id]
         }
-      if(this.demoMode)  {
+      
+        if(this.demoMode)  {
         
         if(data.data.event_type === "call.initiated") {
+          this.fromNumber[data.data.payload.call_control_id] = data.data.payload.to
+          this.toNumber[data.data.payload.call_control_id] = data.data.payload.from
           this.answerCall(data.data.payload.call_control_id, {})
         }
        
         if(data.data.event_type === "call.answered" && this.demoRunning === true) {
+          
           this.demoRunning = false
-          this.fromNumber=data.data.payload.to
-          this.toNumber=data.data.payload.from
+          // this.fromNumber[data.data.payload.call_control_id] = data.data.payload.to
+          // this.toNumber[data.data.payload.call_control_id] = data.data.payload.from
           
           // setTimeout(async () => {
           //   await this.talk(data.data.payload.call_control_id, "Hey!!! To place your order, click the link I just texted you. And we close at 9 PM tonight!", this.fromNumber)
@@ -77,44 +84,48 @@ class CallController extends SpeechService {
 
         
       // Check call state before processing any event
-      if (data.data.event_type !== "call.hangup") {
+      if (this.callStates[data.data.payload.call_control_id] === 'ended' && data.data.event_type !== "call.hangup") {
           this.clearConversationHistory(data.data.payload.call_control_id)
-          
           return;
       }
         
         try {
 
           if(data.data.event_type === "streaming.started"){
-            
+            this.currentEvent[data.data.payload.call_control_id] = "streaming.started"
             res.send("OK")
           }
 
           if(data.data.event_type === "streaming.failed"){
+            this.currentEvent[data.data.payload.call_control_id] = "streaming.failed"
             res.send("OK")
           }
 
           if(data.data.event_type === "streaming.stopped"){
-            
+            this.currentEvent[data.data.payload.call_control_id] = "streaming.stopped"
             res.send("OK")
           }
   
           
           
         if(data.data.event_type === "call.playback.started" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
-        //this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
-        res.send("OK")
+          this.currentEvent[data.data.payload.call_control_id] = "call.playback.ended"
+          this.stopTranscription(data.data.payload.call_control_id, this.fromNumber[data.data.payload.call_control_id])
+          res.send("OK")
         }
+
         if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') {  
-          this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
+          this.currentEvent[data.data.payload.call_control_id] = "call.playback.ended"
+          this.startTranscription(data.data.payload.call_control_id, this.fromNumber[data.data.payload.call_control_id]);
           res.send("OK")
         }
         
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
+          this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
           const call = new telnyx.Call({call_control_id: data.data.payload.call_control_id});
           call.playback_start({from_display_name: "Assistant", playback_content:audioFiller[Math.floor(Math.random() * audioFiller.length)]}).catch((err:any)=> console.log(err.message));
           
-          this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
+          
           const readMessage = await this.mainModelPrompt(data.data.payload.call_control_id, data.data.payload.transcription_data.transcript)
           let promptToSpeak =  await readMessage?.read()
           const prompt = promptToSpeak?.message
@@ -123,13 +134,13 @@ class CallController extends SpeechService {
               let triggerToRemove = "MENU_REQUESTED";
               let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
               this.talk(data.data.payload.call_control_id, modifiedString.trim())
-              this.sendTextMessage(this.fromNumber, this.toNumber, "MENU_REQUESTED", data.data.payload.call_control_id)
+              this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "MENU_REQUESTED", data.data.payload.call_control_id)
           } else if(prompt?.includes("PERSON_REQUESTED")){
               let triggerToRemove = "PERSON_REQUESTED";
               let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
               await this.talk(data.data.payload.call_control_id, modifiedString)
               setTimeout(async () => {
-                await this.transferCall(data.data.payload.call_control_id, clientData[this.fromNumber].redirectNumber)
+                await this.transferCall(data.data.payload.call_control_id, clientData[this.fromNumber[data.data.payload.call_control_id]].redirectNumber)
               }, 5000)
               
               this.stopAIAssistant(data.data.payload.call_control_id)
@@ -138,7 +149,7 @@ class CallController extends SpeechService {
               let triggerToRemove = "RESERVATION_REQUESTED";
               let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
               this.talk(data.data.payload.call_control_id, modifiedString)
-              this.sendTextMessage(this.fromNumber, this.toNumber, "RESERVATION_REQUESTED", data.data.payload.call_control_id)
+              this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "RESERVATION_REQUESTED", data.data.payload.call_control_id)
             } else {
               if(typeof prompt === 'string') {
                 this.talk(data.data.payload.call_control_id, prompt)
@@ -148,6 +159,8 @@ class CallController extends SpeechService {
           res.send("OK")
         }
         if(data.data.event_type === "call.initiated" && this.callStates[data.data.payload.call_control_id] !== 'ended') {
+          this.fromNumber[data.data.payload.call_control_id] = data.data.payload.to
+          this.toNumber[data.data.payload.call_control_id] = data.data.payload.from
           this.currentEvent[data.data.payload.call_control_id] = "call.initiated"
           const startingPrompt = await this.initMainModel(data.data.payload.call_control_id,data.data.payload.to, this.generateSpeech)
           this.answerCall(data.data.payload.call_control_id, startingPrompt)
@@ -156,8 +169,6 @@ class CallController extends SpeechService {
 
         if (data.data.event_type === 'call.answered' && this.callStates[data.data.payload.call_control_id] !== 'ended') {
           this.currentEvent[data.data.payload.call_control_id] = "call.answered"
-          this.fromNumber=data.data.payload.to
-          this.toNumber=data.data.payload.from
           this.noiseSurpression(data.data.payload.call_control_id) 
           res.send("OK")
         }} catch(err) {
@@ -184,7 +195,7 @@ class CallController extends SpeechService {
       );
 
       const data = await resp.json();
-      console.log(data)
+      return data
     }
 
     
@@ -235,10 +246,19 @@ async startTranscription(callControlId: string, targetNumber:string) {
       return;
     }
   
-    
+    let transcription
     const call = new telnyx.Call({call_control_id: callControlId});
-    const transcription = await call.transcription_start({transcription_tracks:"inbound", language: clientData[targetNumber].language, transcription_engine: "B"}).catch((err:any)=> console.log(err.message));
     
+    if(!this.transcribingActive[callControlId]) {
+      transcription = await call.transcription_start({transcription_tracks:"inbound", language: clientData[targetNumber].language, transcription_engine: "B"}).catch((err:any)=> console.log(err.message));
+    }
+    
+    
+    if(transcription.data.result === "ok") {
+      this.transcribingActive[callControlId] = true
+    }
+    
+
     return transcription
   } catch(err){
     
@@ -252,11 +272,19 @@ async stopTranscription(callControlId: string, targetNumber:string) {
     console.log(`Cannot talk, call ${callControlId} has ended.`);
     return;
   }
-
+    let transcription
     const call = new telnyx.Call({call_control_id: callControlId});  
-    const transcription = await call.transcription_stop({language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((error:any)=>console.log(error.message));
     
-    this.talkStream(callControlId)
+
+    if(this.transcribingActive) {
+      transcription = await call.transcription_stop({language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((error:any)=>console.log(error.message));
+    }
+    
+    //stops transcription, starts playback
+    if(transcription.data.result === "ok") {
+      this.transcribingActive[callControlId] = false;
+      this.talkStream(callControlId)
+    }
     
    
     
@@ -279,7 +307,7 @@ async talk(callControllId:string, message:string) {
       const call = new telnyx.Call({call_control_id: callControllId});
          
       
-      const base64Audio = await this.generateSpeech(message, this.fromNumber)
+      const base64Audio = await this.generateSpeech(message, this.fromNumber[callControllId])
       call.playback_start({from_display_name: "Assistant", playback_content:base64Audio}).catch((err:any)=> console.log(err.message));
     } catch(err) {
       console.log(err)
