@@ -112,9 +112,8 @@ class CallController extends SpeechService {
         
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
           const call = new telnyx.Call({call_control_id: data.data.payload.call_control_id});
-          call.playback_start({from_display_name: "Assistant", playback_content:audioFiller[Math.floor(Math.random() * 2)] }).catch((err:any)=> console.log(err.message));
-              
-              
+          call.playback_start({from_display_name: "Assistant", playback_content:audioFiller[Math.floor(Math.random() * audioFiller.length)]}).catch((err:any)=> console.log(err.message));
+          
           this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
           const readMessage = await this.mainModelPrompt(data.data.payload.call_control_id, data.data.payload.transcription_data.transcript)
           let promptToSpeak =  await readMessage?.read()
