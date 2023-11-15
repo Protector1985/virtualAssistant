@@ -77,10 +77,9 @@ class CallController extends SpeechService {
 
         
       // Check call state before processing any event
-      if (this.callStates[data.data.payload.call_control_id] === 'ended' && data.data.event_type !== "call.hangup") {
+      if (data.data.event_type !== "call.hangup") {
           this.clearConversationHistory(data.data.payload.call_control_id)
-          console.log(`Ignoring event ${data.data.event_type} for ended call ${data.data.payload.call_control_id}`);
-          res.status(409).send("Call has already ended");
+          
           return;
       }
         
@@ -103,7 +102,7 @@ class CallController extends SpeechService {
           
           
         if(data.data.event_type === "call.playback.started" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
-        this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
+        //this.stopTranscription(data.data.payload.call_control_id, this.fromNumber)
         res.send("OK")
         }
         if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') {  
