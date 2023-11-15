@@ -158,9 +158,7 @@ class CallController extends SpeechService {
           this.currentEvent[data.data.payload.call_control_id] = "call.answered"
           this.fromNumber=data.data.payload.to
           this.toNumber=data.data.payload.from
-          // const initMessage = this.mainLanguageModel?.choices[0]?.message?.content
-          // this.talk(data.data.payload.call_control_id, initMessage, this.fromNumber)
-          // this.startTranscription(data.data.payload.call_control_id, this.fromNumber);
+          this.noiseSurpression(data.data.payload.call_control_id) 
           res.send("OK")
         }} catch(err) {
           console.log(err)
@@ -254,12 +252,8 @@ async stopTranscription(callControlId: string, targetNumber:string) {
     console.log(`Cannot talk, call ${callControlId} has ended.`);
     return;
   }
- 
-  
-  
-    const call = new telnyx.Call({call_control_id: callControlId});
-    
-              
+
+    const call = new telnyx.Call({call_control_id: callControlId});  
     const transcription = await call.transcription_stop({language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((error:any)=>console.log(error.message));
     
     this.talkStream(callControlId)
@@ -414,9 +408,38 @@ async talk(callControllId:string, message:string) {
     );
     
     const data = await resp.json();
-    
-  
   }
+
+  async noiseSurpression(callControlId:string) {
+    try {
+    console.log("Noise surpression online")
+    const resp = await fetch(
+      `https://api.telnyx.com/v2/calls/${callControlId}/actions/suppression_start`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.TELNYX_API_KEY}`
+        },
+        body: JSON.stringify({
+          client_state: 'aGF2ZSBhIG5pY2UgZGF5ID1d',
+          command_id: '891510ac-f3e4-11e8-af5b-de00688a4901',
+          direction: 'both'
+        })
+      }
+    );
+    
+    const data = await resp.json();
+    console.log(data);
+
+    } catch(err) {
+      console.log(err)
+    }
+    
+
+  }
+
+ 
 
 
 }
