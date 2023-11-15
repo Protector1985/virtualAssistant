@@ -140,7 +140,7 @@ class CallController extends SpeechService {
               let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
               await this.talk(data.data.payload.call_control_id, modifiedString)
               setTimeout(async () => {
-                await this.transferCall(data.data.payload.call_control_id, clientData[this.fromNumber[data.data.payload.call_control_id]].redirectNumber)
+                await this.transferCall(data.data.payload.call_control_id, clientData[this.fromNumber[data.data.payload.call_control_id]].redirectNumber, this.fromNumber[data.data.payload.call_control_id])
               }, 5000)
               
               this.stopAIAssistant(data.data.payload.call_control_id)
@@ -378,7 +378,8 @@ async talk(callControllId:string, message:string) {
         }
     }
 
-    async transferCall(callControlId:string, destination:string) {
+    async transferCall(callControlId:string, destination:string, from:string) {
+      console.log(from)
       try {
      
       if (this.callStates[callControlId] === 'ended') {
@@ -395,7 +396,8 @@ async talk(callControllId:string, message:string) {
       };
 
       const body = JSON.stringify({
-          'to': destination, // The destination number to transfer the call to
+          from:from,
+          to: destination, // The destination number to transfer the call to
       });
 
       
