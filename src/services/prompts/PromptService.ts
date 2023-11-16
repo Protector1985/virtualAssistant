@@ -20,7 +20,7 @@ class PromptService extends PhoneService {
 
     clearConversationHistory(callControlId:string) {
         console.log(`Conversation cleared for ${callControlId}`)
-        console.log(this.conversationHistory)
+       
         //cleans up the conversation history after a call
         delete this.conversationHistory[callControlId]
     }
@@ -59,12 +59,14 @@ class PromptService extends PhoneService {
         }   
     }
 
-    async initMainModel(callControlId:string, targetNumber:string, generateSpeech:any) {
+    async initMainModel(callControlId:string, targetNumber:string) {
       
         try {
             this.conversationHistory = {
                 [callControlId]: []
             }
+            
+            
             
             this.openai = new OpenAI();
             const convo = await this.openai.chat.completions.create({

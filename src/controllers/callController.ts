@@ -15,6 +15,7 @@ class CallController extends SpeechService {
     public toNumber:any = {};
     public callStates: any = {};
     public currentEvent: any = {};
+    public transferredCalls: any = {};
     private demoMode:any= false
     private demoRunning:any = false;
     private transcribingActive:any = {}
@@ -22,11 +23,7 @@ class CallController extends SpeechService {
 
     constructor() {
         super();
-        this.initRoutes();
-        
-        
-
-        
+        this.initRoutes();  
     }
 
     public initRoutes(): void {
@@ -41,9 +38,10 @@ class CallController extends SpeechService {
     
     public async callProcessor(req: Request, res: Response) {
         const data = req.body;
-       
+     
         //cleans up the state!
         if (data.data.event_type === "call.hangup") {
+          delete this.transferredCalls[data.data.payload.call_control_id]
           delete this.toNumber[data.data.payload.call_control_id]
           delete this.fromNumber[data.data.payload.call_control_id]
           delete this.transcribingActive[data.data.payload.call_control_id]
@@ -150,6 +148,11 @@ class CallController extends SpeechService {
               let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
               this.talk(data.data.payload.call_control_id, modifiedString)
               this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "RESERVATION_REQUESTED", data.data.payload.call_control_id)
+            } else if(prompt?.includes("LOCATION_REQUESTED")) {
+              let triggerToRemove = "LOCATION_REQUESTED";
+              let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
+              this.talk(data.data.payload.call_control_id, modifiedString)
+              this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "LOCATION_REQUESTED", data.data.payload.call_control_id)
             } else {
               if(typeof prompt === 'string') {
                 this.talk(data.data.payload.call_control_id, prompt)
@@ -158,12 +161,16 @@ class CallController extends SpeechService {
           }
           res.send("OK")
         }
-        if(data.data.event_type === "call.initiated" && this.callStates[data.data.payload.call_control_id] !== 'ended') {
+        if(data.data.event_type === "call.initiated" && !this.transferredCalls[data.data.payload.call_control_id] && this.callStates[data.data.payload.call_control_id] !== 'ended') {
           this.fromNumber[data.data.payload.call_control_id] = data.data.payload.to
           this.toNumber[data.data.payload.call_control_id] = data.data.payload.from
           this.currentEvent[data.data.payload.call_control_id] = "call.initiated"
-          const startingPrompt = await this.initMainModel(data.data.payload.call_control_id,data.data.payload.to, this.generateSpeech)
+          
+         
+          const startingPrompt = await this.initMainModel(data.data.payload.call_control_id, data.data.payload.to)
           this.answerCall(data.data.payload.call_control_id, startingPrompt)
+          
+          
           res.send("OK")
         }
 
@@ -178,7 +185,7 @@ class CallController extends SpeechService {
     }
 
     async hangupCall(callControlId:string) {
-      console.log("Hanging up call")
+ 
       const resp = await fetch(
         `https://api.telnyx.com/v2/calls/${callControlId}/actions/hangup`,
         {
@@ -341,7 +348,9 @@ async talk(callControllId:string, message:string) {
               return "Here is the menu you requested! https://www.phonepal.com"
             } else {
               if(type === "RESERVATION_REQUESTED") {
-                return clientData[from].reservationText
+                return clientData[from].reservationText()
+              } else if (type === "LOCATION_REQUESTED") {
+                return clientData[from].pinText()
               } else {
                 return clientData[from].textMessageText()
               }
@@ -379,7 +388,7 @@ async talk(callControllId:string, message:string) {
     }
 
     async transferCall(callControlId:string, destination:string, from:string) {
-      console.log(from)
+   
       try {
      
       if (this.callStates[callControlId] === 'ended') {
@@ -409,6 +418,7 @@ async talk(callControllId:string, message:string) {
 
           const data = await response.json();
 
+          this.transferredCalls[callControlId] = true
           if (response.ok) {
               console.log('Call transferred successfully:', data);
           } else {
@@ -460,7 +470,7 @@ async talk(callControllId:string, message:string) {
     );
     
     const data = await resp.json();
-    console.log(data);
+   
 
     } catch(err) {
       console.log(err)
