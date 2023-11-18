@@ -18,7 +18,10 @@ class CallController extends SpeechService {
     public transferredCalls: any = {};
     private demoMode:any= false
     private demoRunning:any = false;
-    private transcribingActive:any = {}
+    private transcribingActive:any = {};
+    //used to prevent multiple calls.
+    private transcriptionArray:any = {};
+
     // private webSocketService: WebsocketService = new WebsocketService()
 
     constructor() {
@@ -38,7 +41,6 @@ class CallController extends SpeechService {
     
     public async callProcessor(req: Request, res: Response) {
         const data = req.body;
-     
         //cleans up the state!
         if (data.data.event_type === "call.hangup") {
           delete this.transferredCalls[data.data.payload.call_control_id]
@@ -88,7 +90,6 @@ class CallController extends SpeechService {
       }
         
         try {
-
           if(data.data.event_type === "streaming.started"){
             this.currentEvent[data.data.payload.call_control_id] = "streaming.started"
             res.send("OK")
@@ -114,50 +115,53 @@ class CallController extends SpeechService {
 
         if(data.data.event_type === "call.playback.ended" && this.callStates[data.data.payload.call_control_id] !== 'ended') {  
           this.currentEvent[data.data.payload.call_control_id] = "call.playback.ended"
+          this.transcriptionArray[data.data.payload.call_control_id] = []
           this.startTranscription(data.data.payload.call_control_id, this.fromNumber[data.data.payload.call_control_id]);
           res.send("OK")
         }
         
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
-          this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
-          const call = new telnyx.Call({call_control_id: data.data.payload.call_control_id});
-          call.playback_start({from_display_name: "Assistant", playback_content:audioFiller[Math.floor(Math.random() * audioFiller.length)]}).catch((err:any)=> console.log(err.message));
           
+          if(this.transcriptionArray[data.data.payload.call_control_id].length === 0) {
+            this.transcriptionArray[data.data.payload.call_control_id].push(data.data.payload.transcription_data.transcript)
+            this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
+            const call = new telnyx.Call({call_control_id: data.data.payload.call_control_id});
+            call.playback_start({from_display_name: "Assistant", playback_content:audioFiller[Math.floor(Math.random() * audioFiller.length)]}).catch((err:any)=> console.log(err.message));
+            const readMessage = await this.mainModelPrompt(data.data.payload.call_control_id, this.transcriptionArray[data.data.payload.call_control_id][0])
+            let promptToSpeak =  await readMessage?.read()
+            const prompt = promptToSpeak?.message
           
-          const readMessage = await this.mainModelPrompt(data.data.payload.call_control_id, data.data.payload.transcription_data.transcript)
-          let promptToSpeak =  await readMessage?.read()
-          const prompt = promptToSpeak?.message
-         
-          if(prompt?.includes("MENU_REQUESTED")) {
-              let triggerToRemove = "MENU_REQUESTED";
-              let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
-              this.talk(data.data.payload.call_control_id, modifiedString.trim())
-              this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "MENU_REQUESTED", data.data.payload.call_control_id)
-          } else if(prompt?.includes("PERSON_REQUESTED")){
-              let triggerToRemove = "PERSON_REQUESTED";
-              let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
-              await this.talk(data.data.payload.call_control_id, modifiedString)
-              setTimeout(async () => {
-                await this.transferCall(data.data.payload.call_control_id, clientData[this.fromNumber[data.data.payload.call_control_id]].redirectNumber, this.fromNumber[data.data.payload.call_control_id])
-              }, 5000)
-              
-              this.stopAIAssistant(data.data.payload.call_control_id)
-              
-          } else if(prompt?.includes("RESERVATION_REQUESTED")) {
-              let triggerToRemove = "RESERVATION_REQUESTED";
-              let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
-              this.talk(data.data.payload.call_control_id, modifiedString)
-              this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "RESERVATION_REQUESTED", data.data.payload.call_control_id)
-            } else if(prompt?.includes("LOCATION_REQUESTED")) {
-              let triggerToRemove = "LOCATION_REQUESTED";
-              let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
-              this.talk(data.data.payload.call_control_id, modifiedString)
-              this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "LOCATION_REQUESTED", data.data.payload.call_control_id)
-            } else {
-              if(typeof prompt === 'string') {
-                this.talk(data.data.payload.call_control_id, prompt)
-              }
-              
+            if(prompt?.includes("MENU_REQUESTED")) {
+                let triggerToRemove = "MENU_REQUESTED";
+                let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
+                this.talk(data.data.payload.call_control_id, modifiedString.trim())
+                this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "MENU_REQUESTED", data.data.payload.call_control_id)
+            } else if(prompt?.includes("PERSON_REQUESTED")){
+                let triggerToRemove = "PERSON_REQUESTED";
+                let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
+                await this.talk(data.data.payload.call_control_id, modifiedString)
+                setTimeout(async () => {
+                  await this.transferCall(data.data.payload.call_control_id, clientData[this.fromNumber[data.data.payload.call_control_id]].redirectNumber, this.fromNumber[data.data.payload.call_control_id])
+                }, 5000)
+                
+                this.stopAIAssistant(data.data.payload.call_control_id)
+                
+            } else if(prompt?.includes("RESERVATION_REQUESTED")) {
+                let triggerToRemove = "RESERVATION_REQUESTED";
+                let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
+                this.talk(data.data.payload.call_control_id, modifiedString)
+                this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "RESERVATION_REQUESTED", data.data.payload.call_control_id)
+              } else if(prompt?.includes("LOCATION_REQUESTED")) {
+                let triggerToRemove = "LOCATION_REQUESTED";
+                let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
+                this.talk(data.data.payload.call_control_id, modifiedString)
+                this.sendTextMessage(this.fromNumber[data.data.payload.call_control_id], this.toNumber[data.data.payload.call_control_id], "LOCATION_REQUESTED", data.data.payload.call_control_id)
+              } else {
+                if(typeof prompt === 'string') {
+                  this.talk(data.data.payload.call_control_id, prompt)
+                }
+                
+            }
           }
           res.send("OK")
         }
@@ -165,7 +169,7 @@ class CallController extends SpeechService {
           this.fromNumber[data.data.payload.call_control_id] = data.data.payload.to
           this.toNumber[data.data.payload.call_control_id] = data.data.payload.from
           this.currentEvent[data.data.payload.call_control_id] = "call.initiated"
-          
+          this.transcriptionArray[data.data.payload.call_control_id] = []
          
           const startingPrompt = await this.initMainModel(data.data.payload.call_control_id, data.data.payload.to)
           this.answerCall(data.data.payload.call_control_id, startingPrompt)
@@ -257,7 +261,7 @@ async startTranscription(callControlId: string, targetNumber:string) {
     const call = new telnyx.Call({call_control_id: callControlId});
     
     if(!this.transcribingActive[callControlId]) {
-      transcription = await call.transcription_start({transcription_tracks:"inbound", language: clientData[targetNumber].language, transcription_engine: "B"}).catch((err:any)=> console.log(err.message));
+      transcription = await call.transcription_start({transcription_tracks:"inbound", language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true, client_state:"TEST"}).catch((err:any)=> console.log(err.message));
     }
     
     
