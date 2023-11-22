@@ -13,13 +13,13 @@ class SpeechService extends Promptservice {
     }
 
     async generateSpeech(text: String, targetNumber:string): Promise<string> {
-        // const elevenModel = clientData[targetNumber].turboModel ? "eleven_turbo_v2" : "eleven_multilingual_v1"
+        // const elevenModel = clientData[targetNumber].Model ? "eleven_turbo_v2" : "eleven_multilingual_v1"
         const apiKey = process.env.ELEVEN_LABS_API_KEY;
         
         if (!apiKey) {
           throw new Error('API key is undefined');
         }
-        const url = `https://api.elevenlabs.io/v1/text-to-speech/D48E1vZ0gNxxkdaRLcHa/stream`;
+        const url = `https://api.elevenlabs.io/v1/text-to-speech/D48E1vZ0gNxxkdaRLcHa/stream?optimize_streaming_latency=4`;
       
         const headers = {
           'accept': 'audio/mpeg',
@@ -31,8 +31,10 @@ class SpeechService extends Promptservice {
           "text": text,
          "model_id": "eleven_turbo_v2",
           "voice_settings": {
-            "stability": 0.4,
-            "similarity_boost": 0.5
+            "stability": 0.3,
+            "similarity_boost": 0.3,
+            "style": 0.4,
+            "use_speaker_boost": true
           }
         });
       
@@ -58,34 +60,7 @@ class SpeechService extends Promptservice {
         throw err
        
       }
-      }
-
-  //  async generateSpeech(text: string, targetNumber: string): Promise<string> {
-  //     try {
-  //         // You can add logic here to select different voice models based on 'targetNumber'
-  //         // For simplicity, this example uses a fixed model and voice
-  //         const model = "tts-1"; // This is an example, replace with the actual model you intend to use
-  //         const voice = "alloy"; // This is an example, replace with the actual voice you intend to use
-  //         this.openai = new OpenAI()
-
-  //         const mp3 = await this.openai.audio.speech.create({
-  //             model: model,
-  //             voice: voice,
-  //             input: text,
-  //         });
-  
-  //         const buffer = Buffer.from(await mp3.arrayBuffer());
-  //         const base64Audio = buffer.toString('base64');
-  
-  //         return base64Audio;
-  //     } catch (err) {
-  //         console.log(err);
-  //         throw err;
-  //     }
-  // }
-
-    
-    
+      }  
     
 }
 

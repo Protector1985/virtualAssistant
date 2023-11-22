@@ -5,6 +5,7 @@ import MongoService from "./services/MongoService";
 import Promptservice from "./services/prompts/PromptService";
 import PhoneService from "./services/phoneCalls/PhoneService";
 import CallController from "./controllers/callController";
+import MongoController from "./controllers/mongoController";
 
 const port:number = Number(process.env.PORT)
 const wsPort: number= Number(process.env.WEB_SOCKET_PORT)
@@ -16,7 +17,10 @@ try {
         wsPort,
         middlewares:[express.json()],
         services: [new PhoneService(), new Promptservice()],
-        controllers:[new CallController()]
+        controllers:[
+            new CallController(), 
+            // new MongoController()
+        ]
     })
 
     //starts the server
