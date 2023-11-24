@@ -383,7 +383,7 @@ async talk(callControllId:string, message:string) {
         try {
           const apiUrl = 'https://api.telnyx.com/v2/messages';
           const telnyxApiKey = process.env.TELNYX_API_KEY; // Using the API Key from .env
-
+         
           function textMessageText(demoMode:boolean) {
             if(demoMode) {
               return "Here is the menu you requested! https://www.phonepal.com"
@@ -404,25 +404,27 @@ async talk(callControllId:string, message:string) {
         };
 
         const body = JSON.stringify({
-            'from': from,
-            'to': to,
-            'text': textMessageText(this.demoMode)
+            from: from,
+            to: to,
+            text: textMessageText(this.demoMode)
         });
 
-        
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: headers,
                 body: body
             });
 
+            console.log({
+              method: 'POST',
+              headers: headers,
+              body: body
+          })
+
+
             const data = await response.json();
-        
-            if (response.ok) {
-                console.log('Message sent successfully:', data);
-            } else {
-                console.error('Error sending message:', data);
-            }
+            
+            
         } catch (error) {
             console.error('Error:', error);
         }

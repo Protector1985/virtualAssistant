@@ -27,6 +27,7 @@ class PromptService extends PhoneService {
 
     async mainModelPrompt(callControlId:string, prompt: string) {
         
+        console.log(this.conversationHistory)
         
         try {
             // Add the user's prompt to the conversation history
