@@ -26,6 +26,8 @@ class PromptService extends PhoneService {
     }
 
     async mainModelPrompt(callControlId:string, prompt: string) {
+        
+        
         try {
             // Add the user's prompt to the conversation history
             this.conversationHistory[callControlId].push({ role: 'user', content: prompt });
@@ -63,6 +65,7 @@ class PromptService extends PhoneService {
       
         try {
             this.conversationHistory = {
+                ...this.conversationHistory,
                 [callControlId]: []
             }
             

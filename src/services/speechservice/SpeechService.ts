@@ -19,7 +19,7 @@ class SpeechService extends Promptservice {
         if (!apiKey) {
           throw new Error('API key is undefined');
         }
-        const url = `https://api.elevenlabs.io/v1/text-to-speech/D48E1vZ0gNxxkdaRLcHa/stream?optimize_streaming_latency=4`;
+        const url = `https://api.elevenlabs.io/v1/text-to-speech/D48E1vZ0gNxxkdaRLcHa/stream?optimize_streaming_latency=2`;
       
         const headers = {
           'accept': 'audio/mpeg',
@@ -31,10 +31,9 @@ class SpeechService extends Promptservice {
           "text": text,
          "model_id": "eleven_turbo_v2",
           "voice_settings": {
-            "stability": 0.3,
-            "similarity_boost": 0.3,
-            "style": 0.4,
-            "use_speaker_boost": true
+            "stability": 0.5,
+            "similarity_boost": 0.5,
+            "style": 0.4,   
           }
         });
       

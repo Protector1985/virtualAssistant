@@ -3,8 +3,11 @@ import fetch from 'node-fetch';
 import express, { Request, Response, Router, NextFunction } from 'express';
 import SpeechService from '../services/speechservice/SpeechService';
 import { clientData } from '../clientData';
-import WebsocketService from '../services/websocket/WebsocketService'
+
 import {audioFiller} from './assets/audioFiller'
+import mediaNames from './assets/soundeffects/mediaNames';
+import { natasha } from './assets/soundeffects/fillers';
+
 const telnyx = require('telnyx')(process.env.TELNYX_API_KEY);
 
 
@@ -43,7 +46,7 @@ class CallController extends SpeechService {
     public async callProcessor(req: Request, res: Response) {
         const data = req.body;
         //decode state for each webhook
-       
+        // console.log(this.transcriptionArray);
         if(data.data.payload.client_state) {
           let speechState = Buffer.from(data.data.payload.client_state, "base64").toString()
           const speechObject = JSON.parse(speechState)
@@ -55,12 +58,14 @@ class CallController extends SpeechService {
 
         //cleans up the state!
         if (data.data.event_type === "call.hangup") {
+          this.clearConversationHistory(data.data.payload.call_control_id)
           delete this.transferredCalls[data.data.payload.call_control_id]
           delete this.toNumber[data.data.payload.call_control_id]
           delete this.fromNumber[data.data.payload.call_control_id]
           delete this.transcribingActive[data.data.payload.call_control_id]
           delete this.currentEvent[data.data.payload.call_control_id]
           delete this.callStates[data.data.payload.call_control_id]
+          res.send("OK")
         }
       
         if(this.demoMode)  {
@@ -89,6 +94,7 @@ class CallController extends SpeechService {
       
         if(data.data.event_type === "call.hangup") {
           this.demoRunning = true
+          this.clearConversationHistory(data.data.payload.call_control_id)
           res.send("OK")
         }
 
@@ -96,10 +102,7 @@ class CallController extends SpeechService {
 
         
       // Check call state before processing any event
-      if (this.callStates[data.data.payload.call_control_id] === 'ended' && data.data.event_type !== "call.hangup") {
-          this.clearConversationHistory(data.data.payload.call_control_id)
-          return;
-      }
+      
         
         try {
           if(data.data.event_type === "streaming.started"){
@@ -140,7 +143,7 @@ class CallController extends SpeechService {
         
         if(data.data.event_type === "call.transcription" && this.callStates[data.data.payload.call_control_id] !== 'ended') { 
          
-          if(this.transcriptionArray[data.data.payload.call_control_id].length === 0) {
+          if(this.transcriptionArray[data.data.payload.call_control_id]?.length === 0) {
             this.transcriptionArray[data.data.payload.call_control_id].push(data.data.payload.transcription_data.transcript)
             this.currentEvent[data.data.payload.call_control_id] = "call.transcription"
             const call = new telnyx.Call({call_control_id: data.data.payload.call_control_id});
@@ -149,7 +152,7 @@ class CallController extends SpeechService {
             speechState = JSON.stringify(speechState);
             speechState = Buffer.from(speechState).toString("base64")
             
-            call.playback_start({ client_state:speechState, from_display_name: "Assistant", playback_content:audioFiller[Math.floor(Math.random() * audioFiller.length)]}).catch((err:any)=> console.log(err.message));
+            call.playback_start({client_state:speechState, from_display_name: "Assistant", media_name: natasha[Math.floor(Math.random() * natasha.length)]}).catch((err:any)=> console.log(err.message));
             const readMessage = await this.mainModelPrompt(data.data.payload.call_control_id, this.transcriptionArray[data.data.payload.call_control_id][0])
             let promptToSpeak =  await readMessage?.read()
             const prompt = promptToSpeak?.message
@@ -253,7 +256,7 @@ class CallController extends SpeechService {
         return;
       }
       
-
+    
         const resp = await fetch(
           `https://api.telnyx.com/v2/calls/${callControlId}/actions/answer`,
           {
@@ -271,9 +274,8 @@ class CallController extends SpeechService {
         );
         
         const data = await resp.json();
-        
-        
         const read = await startingPrompt.read()
+        
         
         this.talk(callControlId, read.message)
           
@@ -343,17 +345,19 @@ async stopTranscription(callControlId: string, targetNumber:string) {
 async talk(callControllId:string, message:string) {
   try {
     
-  if (this.callStates[callControllId] === 'ended') {
-    console.log(`Cannot talk, call ${callControllId} has ended.`);
-    return;
-  }
+    if (this.callStates[callControllId] === 'ended') {
+      console.log(`Cannot talk, call ${callControllId} has ended.`);
+      return;
+    }
+    
       let speechState:any = {call_controll_id: callControllId, state: "NON_FILLER_PLAYBACK"}
       speechState = JSON.stringify(speechState);
       speechState = Buffer.from(speechState).toString("base64")
 
-      const call = new telnyx.Call({call_control_id: callControllId});
-         
       
+      const call = new telnyx.Call({call_control_id: callControllId});
+      
+      await call.playback_start({overlay:true, from_display_name: "Assistant", media_name: mediaNames.restuarantVeryQuiet}).catch((err:any)=> console.log(err.message));
       const base64Audio = await this.generateSpeech(message, this.fromNumber[callControllId])
       call.playback_start({ client_state:speechState, from_display_name: "Assistant", playback_content:base64Audio}).catch((err:any)=> console.log(err.message));
     } catch(err) {
@@ -485,7 +489,7 @@ async talk(callControllId:string, message:string) {
 
   async noiseSurpression(callControlId:string) {
     try {
-    console.log("Noise surpression online")
+  
     const resp = await fetch(
       `https://api.telnyx.com/v2/calls/${callControlId}/actions/suppression_start`,
       {
