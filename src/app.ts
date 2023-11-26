@@ -60,7 +60,7 @@ class App {
 
     //starts server
     startServer() {
-        this.server = this.app.listen(this.port, '0.0.0.0', () => {
+        this.server = this.app.listen(this.port, () => {
             console.log(`Server running on ${this.port}`);
         });
 

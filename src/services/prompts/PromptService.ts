@@ -13,7 +13,6 @@ class PromptService extends PhoneService {
     public openai: any;
     private conversationHistory:any;
     
-
     constructor() {
         super(); 
     }
@@ -26,9 +25,7 @@ class PromptService extends PhoneService {
     }
 
     async mainModelPrompt(callControlId:string, prompt: string) {
-        
-        console.log(this.conversationHistory)
-        
+          
         try {
             // Add the user's prompt to the conversation history
             this.conversationHistory[callControlId].push({ role: 'user', content: prompt });

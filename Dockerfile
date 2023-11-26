@@ -1,27 +1,40 @@
-# Use the official Node.js image with a tag that includes TypeScript
-FROM node:18
+# First stage: Building the application
+# Use an official Node.js 18.12 or later runtime as a parent image
+FROM node:18 AS build
 
-# Create a directory for your app
+# Set the working directory in the container
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json (or npm-shrinkwrap.json)
+# Copy package.json and package-lock.json (or yarn.lock) into the container
 COPY package*.json ./
 
-# Install dependencies - Note that we're not copying the local node_modules
+# Install dependencies, including TypeScript
 RUN npm install
 
-# If you are building your code for production
-# RUN npm ci --only=production
-
-# Copy the rest of your app's source code from your host to your image filesystem.
+# Copy your source code into the container
 COPY . .
 
-# Build the project which will compile the TypeScript files to JavaScript
+# Build your app (compile TypeScript)
 RUN npm run build
 
-# Your app binds to port 3000 so you'll use the EXPOSE instruction to have it mapped by the docker daemon
+# Second stage: Setting up the production environment
+# Use a smaller base image for the production build
+FROM node:18-slim
+
+# Set the working directory in the production container
+WORKDIR /usr/src/app
+
+# Copy package.json and package-lock.json (or yarn.lock) into the container
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm install --only=production
+
+# Copy the build from the previous stage
+COPY --from=build /usr/src/app/dist ./dist
+
+# Your app binds to port 3000, so you'll use the EXPOSE instruction to have it mapped by the Docker daemon
 EXPOSE 3000
 
-# Define the command to run your app using CMD which defines your runtime
-# Here we will use `forever` to run the compiled JavaScript
-CMD [ "npm", "run", "start-forever-process" ]
+# Define the command to run your app
+CMD ["npm", "run", "start:prod"]
