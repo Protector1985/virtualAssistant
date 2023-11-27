@@ -4,7 +4,7 @@ FROM node:18 AS build
 
 # Set the working directory in the container
 WORKDIR /usr/src/app
-
+ENV VARIABLE_NAME=value
 # Copy package.json and package-lock.json (or yarn.lock) into the container
 COPY package*.json ./
 
@@ -37,4 +37,4 @@ COPY --from=build /usr/src/app/dist ./dist
 EXPOSE 3000
 
 # Define the command to run your app
-CMD ["npm", "run", "start:prod"]
+CMD ["npm", "run", "start:prod", "dev"]

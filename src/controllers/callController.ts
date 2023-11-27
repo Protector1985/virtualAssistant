@@ -2,7 +2,7 @@ require('dotenv').config();
 import fetch from 'node-fetch';
 import express, { Request, Response, Router, NextFunction } from 'express';
 import SpeechService from '../services/speechservice/SpeechService';
-import { clientData } from '../clientData';
+
 
 import {audioFiller} from './assets/audioFiller'
 import mediaNames from './assets/soundeffects/mediaNames';
@@ -25,6 +25,7 @@ class CallController extends SpeechService {
     //used to prevent multiple calls.
     private transcriptionArray:any = {};
     private transcriptionArrayModulo:any = {}
+    private clientData:any = {}
 
     // private webSocketService: WebsocketService = new WebsocketService()
 

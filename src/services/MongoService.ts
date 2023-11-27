@@ -6,29 +6,33 @@ class MongoService {
     private clientData: Schema;
     private model:Model<any>;
 
-
     constructor() {
         this.connectMongoDb()
+
         this.clientData= new Schema({
             clientPhone: {type: String, required: true, unique:true },
-            name: {type: String, required: false},
-            hours: {type:String, required: false},
-            location: {type:String, required: false},
-            address: {type: String, required: false},
-            businessType: {type: String, required: false},
-            orderUrl: {type:String, required: false},
-            redirectNumber: {type:String, required: false},
-            reservationUrl: {type:String, required: false},
+            name: {type: String, required: true},
+            hours: {type:String, required: true},
+            location: {type:String, required: true},
+            address: {type: String, required: true},
+            businessType: {type: String, required: true},
+            orderUrl: {type:String, required: true},
+            redirectNumber: {type:String, required: true},
+            reservationUrl: {type:String, required: true},
             language: {type:String, required: true},
-            turboModel: {type: Boolean, required: true}
+            turboModel: {type: Boolean, required: true},
+            conversationHistory: {type: Map, required: false, default:[]},
+            systemPrompt: {type: String, required: true},
+            textMessageText: {type: String, required:true},
+            reservationText: {type:String, required:true},
+            pinLocationText: {type:String, required: true}
         })
         this.model = mongoose.model<any>('Client', this.clientData);
-        
     }
 
-    async initClientData() {
-        const allClients = await this.model.find({});
-        
+    async findClient(clientPhone:String):Promise<any[]> {
+        const client = await this.model.find({clientPhone});
+        return client
     }
 
     async addClient(clientData:any) {
@@ -44,7 +48,12 @@ class MongoService {
                 redirectNumber: clientData.redirectNumber,
                 reservationUrl: clientData.reservationUrl,
                 language: clientData.language,
-                turboModel: clientData.turboModel
+                turboModel: clientData.turboModel,
+                systemPrompt: clientData.systemPrompt,
+                textMessageText: clientData.textMessageText,
+                reservationText: clientData.reservationText,
+                pinLocationText: clientData.pinLocationText
+
             });
 
             await newClient.save();
@@ -66,7 +75,7 @@ class MongoService {
 
             mongoose.connection.on('connected', () => {
                 console.log('----DATABASE CONNECTION SUCCESSFUL-----');
-                this.initClientData();
+                
             });
 
             mongoose.connection.on('disconnected', () => {

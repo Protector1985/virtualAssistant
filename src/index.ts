@@ -17,10 +17,7 @@ try {
         wsPort,
         middlewares:[express.json()],
         services: [new PhoneService(), new Promptservice()],
-        controllers:[
-            new CallController(), 
-            // new MongoController()
-        ]
+        controllers:[new CallController(), new MongoController()]
     })
 
     //starts the server
