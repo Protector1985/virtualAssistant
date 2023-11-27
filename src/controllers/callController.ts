@@ -412,11 +412,11 @@ async talk(callControllId:string, message:string) {
               return "Here is the menu you requested! https://www.phonepal.com"
             } else {
               if(type === "RESERVATION_REQUESTED") {
-                return clientData[from].reservationText()
+                return clientData[from].reservationText
               } else if (type === "LOCATION_REQUESTED") {
-                return clientData[from].pinText()
+                return clientData[from].pinText
               } else {
-                return clientData[from].textMessageText()
+                return clientData[from].textMessageText
               }
             }
           }
