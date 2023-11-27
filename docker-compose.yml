@@ -4,4 +4,6 @@ services:
     build: .
     ports:
       - "5000:5000"
+    environment:
+      - DB=mongodb+srv://merchpal:SunHaus420@dev.pabvs.mongodb.net/PhoneDev?retryWrites=true&w=majority
     restart: unless-stopped
