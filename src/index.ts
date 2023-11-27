@@ -16,7 +16,7 @@ try {
         port,
         wsPort,
         middlewares:[express.json()],
-        services: [new PhoneService(), new Promptservice()],
+        services: [new PhoneService(), new Promptservice(), new MongoService()],
         controllers:[new CallController(), new MongoController()]
     })
 

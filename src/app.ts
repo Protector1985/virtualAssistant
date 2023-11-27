@@ -12,14 +12,22 @@ class App {
     public server!: HttpServer;
     public wsServer!: WebSocketServer;
     public speechClient: any
+    public mongoService:any;
 
     constructor(application: {port: number, wsPort:number, middlewares:any[], services:any[], controllers:any[]}) {
         this.port = application.port,
         this.app = express();
+        this.initDatabase(application.services[2])
         this.initMiddlewares(application.middlewares)
         this.routes(application.controllers)
         this.helloWorld()
+        
     
+    }
+
+    async initDatabase(mongoService:any) {
+        await mongoService.connectMongoDb()
+  
     }
 
     initWebSocket() {

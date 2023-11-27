@@ -7,6 +7,8 @@ import SpeechService from '../services/speechservice/SpeechService';
 import {audioFiller} from './assets/audioFiller'
 import mediaNames from './assets/soundeffects/mediaNames';
 import { natasha } from './assets/soundeffects/fillers';
+import { Speech } from 'openai/resources/audio/speech';
+import MongoService from '../services/MongoService';
 
 const telnyx = require('telnyx')(process.env.TELNYX_API_KEY);
 
@@ -26,12 +28,14 @@ class CallController extends SpeechService {
     private transcriptionArray:any = {};
     private transcriptionArrayModulo:any = {}
     private clientData:any = {}
+    private mongoService:any;
 
     // private webSocketService: WebsocketService = new WebsocketService()
 
-    constructor() {
+    constructor(mongo = new MongoService()) {
         super();
         this.initRoutes();  
+        this.mongoService = mongo;
     }
 
     public initRoutes(): void {
@@ -46,8 +50,6 @@ class CallController extends SpeechService {
     
     public async callProcessor(req: Request, res: Response) {
         const data = req.body;
-        //decode state for each webhook
-        // console.log(this.transcriptionArray);
         if(data.data.payload.client_state) {
           let speechState = Buffer.from(data.data.payload.client_state, "base64").toString()
           const speechObject = JSON.parse(speechState)
@@ -59,13 +61,15 @@ class CallController extends SpeechService {
 
         //cleans up the state!
         if (data.data.event_type === "call.hangup") {
-          this.clearConversationHistory(data.data.payload.call_control_id)
+          this.clearConversationHistory(data.data.payload.call_control_id, this.fromNumber[data.data.payload.call_control_id])
           delete this.transferredCalls[data.data.payload.call_control_id]
           delete this.toNumber[data.data.payload.call_control_id]
+          delete this.clientData[this.fromNumber[data.data.payload.call_control_id]]
           delete this.fromNumber[data.data.payload.call_control_id]
           delete this.transcribingActive[data.data.payload.call_control_id]
           delete this.currentEvent[data.data.payload.call_control_id]
           delete this.callStates[data.data.payload.call_control_id]
+          console.log(this.clientData)
           res.send("OK")
         }
       
@@ -74,6 +78,7 @@ class CallController extends SpeechService {
         if(data.data.event_type === "call.initiated") {
           this.fromNumber[data.data.payload.call_control_id] = data.data.payload.to
           this.toNumber[data.data.payload.call_control_id] = data.data.payload.from
+
           this.answerCall(data.data.payload.call_control_id, {})
         }
        
@@ -95,7 +100,7 @@ class CallController extends SpeechService {
       
         if(data.data.event_type === "call.hangup") {
           this.demoRunning = true
-          this.clearConversationHistory(data.data.payload.call_control_id)
+          this.clearConversationHistory(data.data.payload.call_control_id, this.fromNumber[data.data.payload.call_control_id])
           res.send("OK")
         }
 
@@ -153,7 +158,7 @@ class CallController extends SpeechService {
             speechState = JSON.stringify(speechState);
             speechState = Buffer.from(speechState).toString("base64")
             
-            call.playback_start({client_state:speechState, from_display_name: "Assistant", media_name: natasha[Math.floor(Math.random() * natasha.length)]}).catch((err:any)=> console.log(err.message));
+            call.playback_start({client_state:speechState, from_display_name: "Assistant", audio_url: `https://fillersounds.s3.us-east-2.amazonaws.com/NATASHA_${Math.floor(Math.random() * 6) + 1}.mp3`}).catch((err:any)=> console.log(err.message));
             const readMessage = await this.mainModelPrompt(data.data.payload.call_control_id, this.transcriptionArray[data.data.payload.call_control_id][0])
             let promptToSpeak =  await readMessage?.read()
             const prompt = promptToSpeak?.message
@@ -169,7 +174,7 @@ class CallController extends SpeechService {
                 let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
                 await this.talk(data.data.payload.call_control_id, modifiedString)
                 setTimeout(async () => {
-                  await this.transferCall(data.data.payload.call_control_id, clientData[this.fromNumber[data.data.payload.call_control_id]].redirectNumber, this.fromNumber[data.data.payload.call_control_id])
+                  await this.transferCall(data.data.payload.call_control_id, this.clientData[this.fromNumber[data.data.payload.call_control_id]].redirectNumber, this.fromNumber[data.data.payload.call_control_id])
                 }, 5000)
                 
                 this.stopAIAssistant(data.data.payload.call_control_id)
@@ -204,10 +209,27 @@ class CallController extends SpeechService {
           this.fromNumber[data.data.payload.call_control_id] = data.data.payload.to
           this.toNumber[data.data.payload.call_control_id] = data.data.payload.from
           this.currentEvent[data.data.payload.call_control_id] = "call.initiated"
-          const startingPrompt = await this.initMainModel(data.data.payload.call_control_id, data.data.payload.to)
-          this.answerCall(data.data.payload.call_control_id, startingPrompt)
+          
           //init the transcriptionArray
           this.transcriptionArray[data.data.payload.call_control_id] = []
+          
+          const client = await this.mongoService.findClient(data.data.payload.to)
+          this.clientData = {
+            ...this.clientData,
+            [data.data.payload.to]: {
+              ...client[0]
+            }
+          }
+          
+          
+          if(client.length > 0) {
+            const startingPrompt = await this.initMainModel(data.data.payload.call_control_id, data.data.payload.to, this.clientData[data.data.payload.to]._doc)
+            this.answerCall(data.data.payload.call_control_id, startingPrompt)
+          }
+
+
+         
+          
           
           res.send("OK")
         }
@@ -298,7 +320,7 @@ async startTranscription(callControlId: string, targetNumber:string) {
     const call = new telnyx.Call({call_control_id: callControlId});
     
     if(!this.transcribingActive[callControlId]) {
-      transcription = await call.transcription_start({transcription_tracks:"inbound", language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((err:any)=> console.log(err.message));
+      transcription = await call.transcription_start({transcription_tracks:"inbound", language: this.clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((err:any)=> console.log(err.message));
     }
     
     
@@ -325,7 +347,7 @@ async stopTranscription(callControlId: string, targetNumber:string) {
     
 
     if(this.transcribingActive) {
-      transcription = await call.transcription_stop({language: clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((error:any)=>console.log(error.message));
+      transcription = await call.transcription_stop({language: this.clientData[targetNumber].language, transcription_engine: "B", interim_results: true}).catch((error:any)=>console.log(error.message));
     }
     
     //stops transcription, starts playback
@@ -358,7 +380,7 @@ async talk(callControllId:string, message:string) {
       
       const call = new telnyx.Call({call_control_id: callControllId});
       
-      await call.playback_start({overlay:true, from_display_name: "Assistant", media_name: mediaNames.restuarantVeryQuiet}).catch((err:any)=> console.log(err.message));
+      await call.playback_start({overlay:true, from_display_name: "Assistant", audio_url: `https://fillersounds.s3.us-east-2.amazonaws.com/restaurantVeryQuiet.wav`}).catch((err:any)=> console.log(err.message));
       const base64Audio = await this.generateSpeech(message, this.fromNumber[callControllId])
       call.playback_start({ client_state:speechState, from_display_name: "Assistant", playback_content:base64Audio}).catch((err:any)=> console.log(err.message));
     } catch(err) {
@@ -385,7 +407,7 @@ async talk(callControllId:string, message:string) {
           const apiUrl = 'https://api.telnyx.com/v2/messages';
           const telnyxApiKey = process.env.TELNYX_API_KEY; // Using the API Key from .env
          
-          function textMessageText(demoMode:boolean) {
+          function textMessageText(demoMode:boolean, clientData:any) {
             if(demoMode) {
               return "Here is the menu you requested! https://www.phonepal.com"
             } else {
@@ -407,7 +429,7 @@ async talk(callControllId:string, message:string) {
         const body = JSON.stringify({
             from: from,
             to: to,
-            text: textMessageText(this.demoMode)
+            text: textMessageText(this.demoMode, this.clientData)
         });
 
             const response = await fetch(apiUrl, {

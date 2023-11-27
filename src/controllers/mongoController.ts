@@ -10,16 +10,16 @@ class MongoController extends MongoService {
     constructor() {
         super();
         this.initRoutes();
-        console.log(this.basePath)
+
     }
 
     private initRoutes() {
-        console.log("initialized routes for controller")
         this.router.post(this.basePath + '/add', this.add.bind(this));
     }
 
+    
+
     private async add(req:Request, res:Response) {
-        
         try {
             const sv = await this.addClient(req.body);
             console.log(sv)

@@ -1,8 +1,7 @@
 import { Readable } from 'stream';
 import fetch from 'node-fetch';
 import Promptservice from '../prompts/PromptService';
-import { clientData } from '../../clientData';
-import OpenAI from "openai";
+
 
 class SpeechService extends Promptservice {
     public phone:any

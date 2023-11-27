@@ -3,12 +3,10 @@ import mongoose, {Schema, Document, Model} from "mongoose"
 
 
 class MongoService {
-    private clientData: Schema;
-    private model:Model<any>;
+    private clientData?: Schema;
+    private model?:Model<any>;
 
     constructor() {
-        this.connectMongoDb()
-
         this.clientData= new Schema({
             clientPhone: {type: String, required: true, unique:true },
             name: {type: String, required: true},
@@ -27,17 +25,48 @@ class MongoService {
             reservationText: {type:String, required:true},
             pinLocationText: {type:String, required: true}
         })
-        this.model = mongoose.model<any>('Client', this.clientData);
+
+        if (mongoose.models.Client) {
+            this.model = mongoose.models.Client as Model<any>;
+        } else {
+            this.model = mongoose.model<any>('Client', this.clientData);
+        }
+
     }
+        
+        
+    private async addConversationHistory(phoneNumber: string, conversationData: {}) {
+        const client = await this.findClient(phoneNumber);
+        if (client && client.length > 0) {
+            // Assuming client[0] is the document you want to update
+            let clientDoc = client[0];
+    
+            // Update the conversationHistory Map
+            // Convert conversationData to a Map if it's not already one
+            const newConversationData = new Map(Object.entries(conversationData));
+    
+            // Merge the new data with the existing conversationHistory
+            newConversationData.forEach((value, key) => {
+                clientDoc.conversationHistory.set(key, value);
+            });
+    
+            // Save the updated document
+            await clientDoc.save();
+        } else {
+            // Handle the case where the client is not found
+            console.error('Client not found for phone number:', phoneNumber);
+        }
+    }
+    
 
     async findClient(clientPhone:String):Promise<any[]> {
-        const client = await this.model.find({clientPhone});
+        const client = await this.model!.find({clientPhone});
         return client
     }
 
     async addClient(clientData:any) {
         try {
-            const newClient = new this.model({
+            const newClient = new this.model!({
                 clientPhone: clientData.clientPhone,
                 name: clientData.name,
                 hours: clientData.hours,

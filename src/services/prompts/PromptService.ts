@@ -1,10 +1,8 @@
 
 import OpenAI from "openai";
-import { OpenAIStream, StreamingTextResponse } from 'ai';
 import PhoneService from "../phoneCalls/PhoneService";
-import { clientData } from "../../clientData";
-import SpeechService from "../speechservice/SpeechService";
-import CallController from "../../controllers/callController";
+import moment from 'moment'
+import MongoService from "../MongoService";
 
 const voice: any = require('elevenlabs-node');
 
@@ -12,14 +10,24 @@ class PromptService extends PhoneService {
     
     public openai: any;
     private conversationHistory:any;
+    private mongoController:any;
     
-    constructor() {
+    constructor(database = new MongoService) {
         super(); 
+        this.mongoController = database
     }
 
-    clearConversationHistory(callControlId:string) {
-        console.log(`Conversation cleared for ${callControlId}`)
-       
+    async clearConversationHistory(callControlId:string, clientPhone:string) {
+        
+        const conversationHistory = this.conversationHistory[callControlId].map((item:any) => {
+            if(item.role === "assistant" || item.role === "user") {
+                return item
+            }
+        }).filter((item:any) => item)
+        const conversationData = {
+            [moment().format("MM-DD-YY hh:mm")]: conversationHistory
+        }
+        await this.mongoController.addConversationHistory(clientPhone, conversationData)
         //cleans up the conversation history after a call
         delete this.conversationHistory[callControlId]
     }
@@ -59,7 +67,7 @@ class PromptService extends PhoneService {
         }   
     }
 
-    async initMainModel(callControlId:string, targetNumber:string) {
+    async initMainModel(callControlId:string, targetNumber:string, clientData:any) {
       
         try {
             this.conversationHistory = {
@@ -76,12 +84,12 @@ class PromptService extends PhoneService {
                 max_tokens: 100,
                 temperature: 0.4,
                 messages: [
-                    { role: 'system', content: clientData[targetNumber].systemPrompt()},
+                    { role: 'system', content: clientData.systemPrompt},
                 ],
             });
 
             // Add the initial system message to the conversation history
-            this.conversationHistory[callControlId].push({ role: 'system', content: clientData[targetNumber].systemPrompt()})
+            this.conversationHistory[callControlId].push({ role: 'system', content: clientData.systemPrompt})
             // this.conversationHistory[callControlId].push({ role: 'assistant', content: convo.choices[0].message.content + "Keep response short within 50 tokens. Don't start the sentence with Assistant - just the description of what you want to say." });
                 
             const stream = {
