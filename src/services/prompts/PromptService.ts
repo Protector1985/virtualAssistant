@@ -18,18 +18,23 @@ class PromptService extends PhoneService {
     }
 
     async clearConversationHistory(callControlId:string, clientPhone:string) {
-        
-        const conversationHistory = this.conversationHistory[callControlId].map((item:any) => {
-            if(item.role === "assistant" || item.role === "user") {
-                return item
+        try {
+            const conversationHistory = this.conversationHistory[callControlId].map((item:any) => {
+                if(item.role === "assistant" || item.role === "user") {
+                    return item
+                }
+            }).filter((item:any) => item)
+            const conversationData = {
+                [moment().format("MM-DD-YY hh:mm")]: conversationHistory
             }
-        }).filter((item:any) => item)
-        const conversationData = {
-            [moment().format("MM-DD-YY hh:mm")]: conversationHistory
+            await this.mongoController.addConversationHistory(clientPhone, conversationData)
+            //cleans up the conversation history after a call
+            delete this.conversationHistory[callControlId]
+
+        } catch(err) {
+            console.log(err)
         }
-        await this.mongoController.addConversationHistory(clientPhone, conversationData)
-        //cleans up the conversation history after a call
-        delete this.conversationHistory[callControlId]
+        
     }
 
     async mainModelPrompt(callControlId:string, prompt: string) {

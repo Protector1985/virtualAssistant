@@ -174,7 +174,7 @@ class CallController extends SpeechService {
                 let modifiedString = prompt?.replace(new RegExp(triggerToRemove, 'g'), "");
                 await this.talk(data.data.payload.call_control_id, modifiedString)
                 setTimeout(async () => {
-                  await this.transferCall(data.data.payload.call_control_id, this.clientData[this.fromNumber[data.data.payload.call_control_id]].redirectNumber, this.fromNumber[data.data.payload.call_control_id])
+                  await this.transferCall(data.data.payload.call_control_id, this.clientData[this.fromNumber[data.data.payload.call_control_id]]._doc.redirectNumber, this.fromNumber[data.data.payload.call_control_id])
                 }, 5000)
                 
                 this.stopAIAssistant(data.data.payload.call_control_id)
@@ -412,15 +412,15 @@ async talk(callControllId:string, message:string) {
               return "Here is the menu you requested! https://www.phonepal.com"
             } else {
               if(type === "RESERVATION_REQUESTED") {
-                return clientData[from].reservationText
+                return clientData[from]._doc.reservationText
               } else if (type === "LOCATION_REQUESTED") {
-                return clientData[from].pinText
+                return clientData[from]._doc.pinText
               } else {
-                return clientData[from].textMessageText
+                return clientData[from]._doc.textMessageText
               }
             }
           }
-        
+      
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${telnyxApiKey}`
@@ -473,6 +473,8 @@ async talk(callControllId:string, message:string) {
             to: destination, // The destination number to transfer the call to
         });
 
+        console.log(from)
+        console.log(destination)
       
           const response = await fetch(apiUrl, {
               method: 'POST',
