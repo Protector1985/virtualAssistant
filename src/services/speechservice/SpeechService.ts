@@ -1,23 +1,24 @@
 import { Readable } from 'stream';
 import fetch from 'node-fetch';
 import Promptservice from '../prompts/PromptService';
-import { clientData } from '../../clientData';
+
 
 class SpeechService extends Promptservice {
     public phone:any
+    public openai:any 
     constructor() {
       super();
       
     }
 
     async generateSpeech(text: String, targetNumber:string): Promise<string> {
-        const elevenModel = clientData[targetNumber].turboModel ? "eleven_turbo_v2" : "eleven_multilingual_v1"
+        // const elevenModel = clientData[targetNumber].Model ? "eleven_turbo_v2" : "eleven_multilingual_v1"
         const apiKey = process.env.ELEVEN_LABS_API_KEY;
         
         if (!apiKey) {
           throw new Error('API key is undefined');
         }
-        const url = `https://api.elevenlabs.io/v1/text-to-speech/D48E1vZ0gNxxkdaRLcHa/stream`;
+        const url = `https://api.elevenlabs.io/v1/text-to-speech/D48E1vZ0gNxxkdaRLcHa/stream?optimize_streaming_latency=2`;
       
         const headers = {
           'accept': 'audio/mpeg',
@@ -27,10 +28,11 @@ class SpeechService extends Promptservice {
       
         const body = JSON.stringify({
           "text": text,
-         "model_id": elevenModel,
+         "model_id": "eleven_turbo_v2",
           "voice_settings": {
-            "stability": 0.4,
-            "similarity_boost": 0.5
+            "stability": 0.5,
+            "similarity_boost": 0.5,
+            "style": 0.4,   
           }
         });
       
@@ -56,8 +58,7 @@ class SpeechService extends Promptservice {
         throw err
        
       }
-      }
-    
+      }  
     
 }
 

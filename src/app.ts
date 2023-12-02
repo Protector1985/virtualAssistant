@@ -12,14 +12,22 @@ class App {
     public server!: HttpServer;
     public wsServer!: WebSocketServer;
     public speechClient: any
+    public mongoService:any;
 
     constructor(application: {port: number, wsPort:number, middlewares:any[], services:any[], controllers:any[]}) {
         this.port = application.port,
         this.app = express();
+        this.initDatabase(application.services[2])
         this.initMiddlewares(application.middlewares)
         this.routes(application.controllers)
         this.helloWorld()
+        
     
+    }
+
+    async initDatabase(mongoService:any) {
+        await mongoService.connectMongoDb()
+  
     }
 
     initWebSocket() {
@@ -27,40 +35,40 @@ class App {
         let fileStream:any;
         let isCallActive = false
         
-        this.wsServer.on('connection', (ws) => {
-            console.log('WebSocket connection established');
+        // this.wsServer.on('connection', (ws) => {
+        //     console.log('WebSocket connection established');
             
-            ws.on('message', (message) => {
-                const messageString = message.toString();
-                try {
-                    const messageJSON = JSON.parse(messageString);
+            // ws.on('message', (message) => {
+            //     const messageString = message.toString();
+            //     try {
+            //         const messageJSON = JSON.parse(messageString);
         
-                    if (messageJSON.event === "start") {
-                        console.log("Call Started:", messageJSON);
+            //         if (messageJSON.event === "start") {
+            //             console.log("Call Started:", messageJSON);
                        
-                    } else if (messageJSON.event === "media") {
-                        const rawAudio = Buffer.from(messageJSON.media.payload, 'base64');
+            //         } else if (messageJSON.event === "media") {
+            //             const rawAudio = Buffer.from(messageJSON.media.payload, 'base64');
                         
-                    } else if (messageJSON.event === "stop") {
-                        console.log("Call Stopped:", messageJSON);
+            //         } else if (messageJSON.event === "stop") {
+            //             console.log("Call Stopped:", messageJSON);
                         
-                    }
-                } catch (e) {
-                    console.error('Error parsing JSON:', e);
-                }
-            });
+            //         }
+            //     } catch (e) {
+            //         console.error('Error parsing JSON:', e);
+            //     }
+            // });
 
-            ws.on('close', () => {
-                console.log('WebSocket connection closed');
-            });
+            // ws.on('close', () => {
+            //     console.log('WebSocket connection closed');
+            // });
 
             // You can also handle other events like 'error'
-        });
+        // });
     }
 
     //starts server
     startServer() {
-        this.server = this.app.listen(this.port, '0.0.0.0', () => {
+        this.server = this.app.listen(this.port, () => {
             console.log(`Server running on ${this.port}`);
         });
 

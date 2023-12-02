@@ -11,7 +11,7 @@ class WebSocketService {
         this.webSocket = new WebSocket('wss://4e1ed80913dc.ngrok.app/');
 
         this.webSocket.onopen = () => {
-            
+            console.log('WebSocket Connection Established');
             // Additional logic on connection open
         };
 
